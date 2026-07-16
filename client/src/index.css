@@ -1,0 +1,42 @@
+:root {
+  --black: #111;
+  --gray-900: #1a1a1a;
+  --gray-800: #222;
+  --gray-700: #333;
+  --gray-600: #555;
+  --gray-400: #999;
+  --gray-300: #ccc;
+  --gray-200: #e5e5e5;
+  --white: #f5f5f5;
+
+  --sans: 'Segoe UI', system-ui, Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 15px/1.5 var(--sans);
+  color: var(--gray-400);
+  background: var(--black);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+}
+
+h1, h2 {
+  color: var(--white);
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
