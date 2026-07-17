@@ -1,55 +1,61 @@
-import { useState, useEffect } from 'react'
-import { fetchNotes, createNote, deleteNote } from './api'
-import './App.css'
+import { useState, useEffect } from "react";
+import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
+import "./App.css";
 
 function App() {
-  const [notes, setNotes] = useState([])
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  const [notes, setNotes] = useState([]);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     fetchNotes()
-      .then(res => {
-        const withSizes = res.data.map(n => ({ ...n, size: 'small' }))
-        setNotes(withSizes)
+      .then((res) => {
+        const withSizes = res.data.map((n) => ({ ...n, size: "small" }));
+        setNotes(withSizes);
       })
-      .catch(err => console.error('Failed to load notes:', err))
-  }, [])
+      .catch((err) => console.error("Failed to load notes:", err));
+  }, []);
 
-  const addNote = async (e) => {
-    e.preventDefault()
-    if (!title.trim() && !body.trim()) return
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title.trim() && !body.trim()) return;
     try {
-      const res = await createNote({ title: title.trim(), body: body.trim() })
-      const saved = { ...res.data[0], size: 'small' }
-      console.log(saved.title);
-      setNotes(prev => [...prev, saved])
-      setTitle('')
-      setBody('')
+      if (editingId) {
+        const res = await updateNote({ id: editingId, title: title.trim(), body: body.trim() });
+        setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
+      } else {
+        const res = await createNote({ title: title.trim(), body: body.trim() });
+        const saved = { ...res.data[0], size: "small" };
+        setNotes((prev) => [...prev, saved]);
+      }
+      setTitle("");
+      setBody("");
+      setEditingId(null);
     } catch (err) {
-      console.error('Failed to create note:', err)
+      console.error("Failed to save note:", err);
     }
-  }
+  };
 
   const removeNote = async (id) => {
     try {
-      await deleteNote(id)
-      setNotes(prev => prev.filter(n => n.id !== id))
+      await deleteNote(id);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
-      console.error('Failed to delete note:', err)
+      console.error("Failed to delete note:", err);
     }
-  }
+  };
 
   const cycleSize = (id) => {
-    const sizes = ['small', 'wide', 'tall', 'big']
-    setNotes(prev =>
-      prev.map(n => {
-        if (n.id !== id) return n
-        const idx = sizes.indexOf(n.size)
-        return { ...n, size: sizes[(idx + 1) % sizes.length] }
-      })
-    )
-  }
+    const sizes = ["small", "wide", "tall", "big"];
+    setNotes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        const idx = sizes.indexOf(n.size);
+        return { ...n, size: sizes[(idx + 1) % sizes.length] };
+      }),
+    );
+  };
 
   return (
     <div className="notes-app">
@@ -58,7 +64,8 @@ function App() {
         <h1>Notes</h1>
         <p className="subtitle">Your royal collection</p>
       </header>
-      <form className="note-form" onSubmit={addNote}>
+      {editingId && <p className="editing-status">editing...</p>}
+      <form className="note-form" onSubmit={handleSubmit}>
         <input
           type="text"
           placeholder="Title"
@@ -71,7 +78,12 @@ function App() {
           rows={3}
           onChange={(e) => setBody(e.target.value)}
         />
-        <button type="submit">Add Note</button>
+        <button type="submit">{editingId ? "Update Note" : "Add Note"}</button>
+        {editingId && (
+          <button type="button" onClick={() => { setEditingId(null); setTitle(""); setBody(""); }}>
+            Cancel
+          </button>
+        )}
       </form>
       <div className="notes-grid">
         {notes.length === 0 && (
@@ -87,6 +99,18 @@ function App() {
               ◇
             </button>
             <button
+              className="edit-button"
+              onClick={() => {
+                setEditingId(note.id);
+                setTitle(note.title);
+                setBody(note.body);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              title="Edit"
+            >
+              ∆
+            </button>
+            <button
               className="remove"
               onClick={() => removeNote(note.id)}
               title="Delete"
@@ -99,7 +123,7 @@ function App() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

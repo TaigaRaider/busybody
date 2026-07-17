@@ -21,6 +21,13 @@
   color: var(--gray-600);
 }
 
+.editing-status {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
 .note-form {
   display: flex;
   flex-direction: column;
@@ -101,6 +108,7 @@
 
 .note-card h2 {
   font-size: 14px;
+  margin-top: 10px;
   margin-bottom: 8px;
   padding-right: 36px;
   text-transform: uppercase;
@@ -114,7 +122,8 @@
 }
 
 .note-card .remove,
-.note-card .resize {
+.note-card .resize,
+.note-card .edit-button {
   position: absolute;
   background: none;
   border: none;
@@ -126,6 +135,7 @@
 }
 
 .note-card:hover .remove,
+.note-card:hover .edit-button,
 .note-card:hover .resize {
   opacity: 1;
 }
@@ -134,7 +144,10 @@
   top: 10px;
   left: 10px;
 }
-
+.note-card .edit-button{
+  top: 10px;
+  right: 50px;
+}
 .note-card .remove {
   top: 10px;
   right: 10px;
@@ -143,7 +156,9 @@
 .note-card .resize:hover {
   color: var(--white);
 }
-
+.note-card .edit-button:hover{
+  color: pink;
+}
 .note-card .remove:hover {
   color: #e53e3e;
 }
