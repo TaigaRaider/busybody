@@ -1,25 +1,25 @@
-import { config } from "dotenv";
 import express from "express";
 import cors from "cors";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import { eq } from "drizzle-orm";
 import { notesTable } from "./db/schema.js";
-const corsOptions = {
-  "origin": "http://localhost:5173",
-}
 
-config();
 const app = express();
-
-app.use(cors(corsOptions));
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json());
 
-const db = drizzle(process.env.DB_FILE_NAME);
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+const db = drizzle(client);
 
 app.get("/", async (req, res) => {
   const notes = await db.select().from(notesTable).all();
   res.json(notes);
 });
+
 app.get("/notes", async (req, res) => {
   try {
     const notes = await db.select().from(notesTable);
@@ -67,10 +67,16 @@ app.delete("/notes/:id", async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`App started at http://localhost:${process.env.PORT}`);
-});
+const isVercel = process.env.VERCEL === "1";
+if (!isVercel) {
+  const port = process.env.PORT || 8080;
+  app.listen(port, () => {
+    console.log(`App started at http://localhost:${port}`);
+  });
+}
 
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled rejection:", err);
 });
+
+export default app;

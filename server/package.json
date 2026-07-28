@@ -14,12 +14,9 @@
   "type": "module",
   "dependencies": {
     "@libsql/client": "^0.17.4",
-    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
     "drizzle-orm": "^1.0.0-rc.4",
-    "express": "^5.2.1",
-    "sqlite3": "^6.0.1"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "drizzle-kit": "^1.0.0-rc.4",

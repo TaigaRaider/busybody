@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "dependencies": {
+    "express": "^5.2.1",
+    "cors": "^2.8.6",
+    "@libsql/client": "^0.17.4",
+    "drizzle-orm": "^1.0.0-rc.4"
+  }
+}
