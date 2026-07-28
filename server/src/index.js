@@ -9,6 +9,8 @@ const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json());
 
+app.get("/ping", (req, res) => res.json({ ok: true, url: req.url }));
+
 const client = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
@@ -74,6 +76,11 @@ if (!isVercel) {
     console.log(`App started at http://localhost:${port}`);
   });
 }
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message, stack: err.stack?.split("\n").slice(0, 3).join("\n") });
+});
 
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled rejection:", err);
