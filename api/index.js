@@ -27,9 +27,9 @@ app.get("/ping", (req, res) => res.json({ ok: true }));
 app.get("/notes", async (req, res) => {
   try {
     const result = await db.select().from(notes);
-    res.json(result);
+    return res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json({ error: String(e), message: e?.message, stack: e?.stack?.split("\n").slice(0, 5) });
   }
 });
 
