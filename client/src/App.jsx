@@ -2,6 +2,14 @@ import { useState, useEffect } from "react";
 import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
 import "./App.css";
 
+const COLORS = ["#e06c75","#61afef","#98c379","#d19a66","#c678dd","#56b6c2","#e5c07b","#be5046","#7ec8e3","#abb2bf","#b9826b","#83a598"];
+
+function getColor() {
+  let c = localStorage.getItem("userColor");
+  if (!c) { c = COLORS[Math.floor(Math.random() * COLORS.length)]; localStorage.setItem("userColor", c) }
+  return c;
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -39,10 +47,10 @@ function App() {
     if (!title.trim() && !body.trim()) return;
     try {
       if (editingId) {
-        const res = await updateNote({ id: editingId, title: title.trim(), body: body.trim() });
+        const res = await updateNote({ id: editingId, title: title.trim(), body: body.trim(), editorColor: getColor() });
         setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
       } else {
-        const res = await createNote({ title: title.trim(), body: body.trim() });
+        const res = await createNote({ title: title.trim(), body: body.trim(), authorColor: getColor() });
         const saved = { ...res.data[0], size: "small" };
         setNotes((prev) => [...prev, saved]);
       }
@@ -146,15 +154,18 @@ function App() {
               </button>
             )}
             </div>
-            {note.title && <h2>{note.title}</h2>}
-            <p>{note.body}</p>
-            <p className="note-timestamp">
-              {timeAgo(note.createdAt)}{
-                note.updatedAt && note.createdAt !== note.updatedAt
-                  ? ` · edited ${timeAgo(note.updatedAt)}`
-                  : ""
-              }
-            </p>
+            <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
+              {note.title && <h2>{note.title}</h2>}
+              <p>{note.body}</p>
+              <p className="note-timestamp">
+                <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
+                {timeAgo(note.createdAt)}{
+                  note.updatedAt && note.createdAt !== note.updatedAt
+                    ? ` · edited ${timeAgo(note.updatedAt)}`
+                    : ""
+                }
+              </p>
+            </div>
           </div>
         ))}
       </div>

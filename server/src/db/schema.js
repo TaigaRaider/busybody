@@ -6,4 +6,6 @@ export const notesTable = sqliteTable("notes", {
   body: text('body'),
   createdAt: text('created_at'),
   updatedAt: text('updated_at'),
+  authorColor: text('author_color'),
+  editorColor: text('editor_color'),
 });
