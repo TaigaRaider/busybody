@@ -2,6 +2,18 @@ import { useState, useEffect } from "react";
 import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
 import "./App.css";
 
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 function App() {
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
@@ -120,6 +132,13 @@ function App() {
             </div>
             {note.title && <h2>{note.title}</h2>}
             <p>{note.body}</p>
+            <p className="note-timestamp">
+              {timeAgo(note.createdAt)}{
+                note.updatedAt && note.createdAt !== note.updatedAt
+                  ? ` · edited ${timeAgo(note.updatedAt)}`
+                  : ""
+              }
+            </p>
           </div>
         ))}
       </div>

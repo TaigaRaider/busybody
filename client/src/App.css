@@ -131,6 +131,13 @@
   word-break: break-word;
 }
 
+.note-card .note-timestamp {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+
 .card-buttons-top-right{
   position: absolute;
   top: 8px;

@@ -35,7 +35,8 @@ app.get("/notes", async (req, res) => {
 app.post("/notes", async (req, res) => {
   try {
     const { title, body } = req.body;
-    const note = await db.insert(notesTable).values({ title, body }).returning();
+    const now = new Date().toISOString();
+    const note = await db.insert(notesTable).values({ title, body, createdAt: now, updatedAt: now }).returning();
     res.status(201).json(note);
   } catch (e) {
     console.error("POST /notes error:", e.cause ?? e);
@@ -46,9 +47,10 @@ app.post("/notes", async (req, res) => {
 app.put("/notes", async (req, res) => {
   try {
     const { id, title, body } = req.body;
+    const now = new Date().toISOString();
     const note = await db
       .update(notesTable)
-      .set({ title, body })
+      .set({ title, body, updatedAt: now })
       .where(eq(notesTable.id, id))
       .returning();
     res.json(note);

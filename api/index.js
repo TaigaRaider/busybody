@@ -20,6 +20,7 @@ const notes = sqliteTable("notes", {
   title: text("title"),
   body: text("body"),
   createdAt: text("created_at"),
+  updatedAt: text("updated_at"),
 });
 
 app.get("/ping", (req, res) => res.json({ ok: true }));
@@ -36,7 +37,8 @@ app.get("/notes", async (req, res) => {
 app.post("/notes", async (req, res) => {
   try {
     const { title, body } = req.body;
-    const result = await db.insert(notes).values({ title, body }).returning();
+    const now = new Date().toISOString();
+    const result = await db.insert(notes).values({ title, body, createdAt: now, updatedAt: now }).returning();
     res.status(201).json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -46,9 +48,10 @@ app.post("/notes", async (req, res) => {
 app.put("/notes", async (req, res) => {
   try {
     const { id, title, body } = req.body;
+    const now = new Date().toISOString();
     const result = await db
       .update(notes)
-      .set({ title, body })
+      .set({ title, body, updatedAt: now })
       .where(eq(notes.id, id))
       .returning();
     res.json(result);
