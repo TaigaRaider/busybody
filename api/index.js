@@ -62,6 +62,10 @@ app.put("/notes", async (req, res) => {
 
 app.delete("/notes/:id", async (req, res) => {
   try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token || token !== process.env.ADMIN_TOKEN) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     await db.delete(notes).where(eq(notes.id, Number(req.params.id)));
     res.status(204).end();
   } catch (e) {

@@ -19,6 +19,7 @@ function App() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [editingId, setEditingId] = useState(null);
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
 
   useEffect(() => {
     const load = () =>
@@ -55,7 +56,7 @@ function App() {
 
   const removeNote = async (id) => {
     try {
-      await deleteNote(id);
+      await deleteNote(id, adminToken);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
@@ -78,6 +79,15 @@ function App() {
       <header className="header">
         <h1>TABLOID</h1>
         <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
+        <div className="admin-bar">
+          {adminToken ? (
+            <button className="admin-logout" onClick={() => { setAdminToken(""); localStorage.removeItem("adminToken") }}>admin</button>
+          ) : (
+            <form className="admin-login" onSubmit={(e) => { e.preventDefault(); const t = e.target.token.value; setAdminToken(t); localStorage.setItem("adminToken", t) }}>
+              <input name="token" type="password" placeholder="admin key" />
+            </form>
+          )}
+        </div>
       </header>
       {editingId && <p className="editing-status">editing...</p>}
       <form className="note-form" onSubmit={handleSubmit}>
@@ -126,13 +136,15 @@ function App() {
             >
               ∆
             </button>
-            <button
-              className="remove"
-              onClick={() => removeNote(note.id)}
-              title="Delete"
-            >
-              ×
-            </button>
+            {adminToken && (
+              <button
+                className="remove"
+                onClick={() => removeNote(note.id)}
+                title="Delete"
+              >
+                ×
+              </button>
+            )}
             </div>
             {note.title && <h2>{note.title}</h2>}
             <p>{note.body}</p>
