@@ -7,5 +7,7 @@ export const notesTable = sqliteTable("notes", {
   createdAt: text('created_at'),
   updatedAt: text('updated_at'),
   authorColor: text('author_color'),
+  authorId: text('author_id'),
   editorColor: text('editor_color'),
+  history: text('history'),
 });

@@ -239,7 +239,8 @@
 }
 .note-card .remove,
 .note-card .resize,
-.note-card .edit-button {
+.note-card .edit-button,
+.note-card .rollback {
   background: none;
   border: none;
   color: var(--gray-600);
@@ -251,7 +252,8 @@
 
 .note-card:hover .remove,
 .note-card:hover .edit-button,
-.note-card:hover .resize {
+.note-card:hover .resize,
+.note-card:hover .rollback {
   opacity: 1;
 }
 
@@ -265,6 +267,9 @@
 }
 .note-card .remove:hover {
   color: #e53e3e;
+}
+.note-card .rollback:hover {
+  color: #e5c07b;
 }
 
 .empty {
@@ -360,7 +365,8 @@
 
   .note-card .remove,
   .note-card .resize,
-  .note-card .edit-button {
+  .note-card .edit-button,
+  .note-card .rollback {
     opacity: 1;
     padding: 6px 8px;
     font-size: 14px;

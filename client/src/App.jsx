@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
+import { fetchNotes, createNote, deleteNote, updateNote, rollbackNote } from "./api";
 import "./App.css";
 
 const COLORS = ["#e06c75","#61afef","#98c379","#d19a66","#c678dd","#56b6c2","#e5c07b","#be5046","#7ec8e3","#abb2bf","#b9826b","#83a598"];
@@ -8,6 +8,12 @@ function getColor() {
   let c = localStorage.getItem("userColor");
   if (!c) { c = COLORS[Math.floor(Math.random() * COLORS.length)]; localStorage.setItem("userColor", c) }
   return c;
+}
+
+function getAuthorId() {
+  let id = localStorage.getItem("authorId");
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem("authorId", id) }
+  return id;
 }
 
 function timeAgo(dateStr) {
@@ -100,7 +106,7 @@ function App() {
         setEditingId(null);
       } else {
         if (!title.trim() && !body.trim()) return;
-        const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor });
+        const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor, authorId: getAuthorId() });
         const saved = { ...res.data[0], size: "small" };
         setNotes((prev) => [...prev, saved]);
       }
@@ -112,14 +118,25 @@ function App() {
     }
   };
 
-  const removeNote = async (id) => {
+  const removeNote = async (id, token) => {
     try {
-      await deleteNote(id, adminToken);
+      await deleteNote(id, token);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
     }
   };
+
+  const handleRollback = async (id, token) => {
+    try {
+      const res = await rollbackNote(id, token);
+      setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...res.data[0] } : n)));
+    } catch (err) {
+      console.error("Failed to rollback:", err);
+    }
+  };
+
+  const myId = getAuthorId();
 
   const cycleSize = (id) => {
     const sizes = ["small", "wide", "tall", "big"];
@@ -212,8 +229,14 @@ function App() {
               <div className="card-buttons-top-right">
                 <button className="resize" onClick={() => cycleSize(note.id)} title="Resize">◇</button>
                 <button className="edit-button" onClick={() => startEdit(note)} title="Edit">∆</button>
-                {adminToken && (
-                  <button className="remove" onClick={() => removeNote(note.id)} title="Delete">×</button>
+                {(note.authorId === myId) && (
+                  <button className="remove" onClick={() => removeNote(note.id, myId)} title="Delete">×</button>
+                )}
+                {adminToken && note.authorId !== myId && (
+                  <button className="remove" onClick={() => removeNote(note.id, adminToken)} title="Delete">×</button>
+                )}
+                {(note.authorId === myId || adminToken) && (
+                  <button className="rollback" onClick={() => handleRollback(note.id, note.authorId === myId ? myId : adminToken)} title="Rollback">↩</button>
                 )}
               </div>
               <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>

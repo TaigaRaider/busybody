@@ -7,3 +7,5 @@ export const createNote = (data) => api.post('/notes', data)
 export const updateNote = (data) => api.put('/notes', data)
 export const deleteNote = (id, token) =>
   api.delete(`/notes/${id}`, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+export const rollbackNote = (id, token) =>
+  api.put(`/notes/${id}/rollback`, null, { headers: { Authorization: `Bearer ${token}` } })
