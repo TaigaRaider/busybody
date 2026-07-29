@@ -21,12 +21,16 @@ function App() {
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
-    fetchNotes()
-      .then((res) => {
-        const withSizes = res.data.map((n) => ({ ...n, size: "small" }));
-        setNotes(withSizes);
-      })
-      .catch((err) => console.error("Failed to load notes:", err));
+    const load = () =>
+      fetchNotes()
+        .then((res) => setNotes((prev) => {
+          const prevMap = new Map(prev.map((n) => [n.id, n]));
+          return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
+        }))
+        .catch((err) => console.error("Failed to load notes:", err));
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, []);
 
   const handleSubmit = async (e) => {
