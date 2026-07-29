@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
 import "./App.css";
 
@@ -25,19 +25,15 @@ function timeAgo(dateStr) {
 function parseColorTags(body) {
   if (!body) return [];
   const parts = [];
-  const re = /\{%\s*([^%]+)\s*\}(.*?)\{%\s*end\s*%\}/gs;
+  const re = /\{%\s*([^%]+?)\s*%\}([\s\S]*?)\{%\s*end\s*%\}/g;
   let last = 0, m;
   while ((m = re.exec(body)) !== null) {
-    if (m.index > last) parts.push({ text: body.slice(last, m.index), color: null });
+    if (m.index > last) parts.push({ text: body.slice(last, m.index), color: "var(--gray-400)" });
     parts.push({ text: m[2], color: m[1].trim() });
     last = re.lastIndex;
   }
-  if (last < body.length) parts.push({ text: body.slice(last), color: null });
+  if (last < body.length) parts.push({ text: body.slice(last), color: "var(--gray-400)" });
   return parts;
-}
-
-function segmentsToPlain(segments) {
-  return segments.map(s => s.text).join("");
 }
 
 function rebuildBody(edited, segments, userColor) {
@@ -77,20 +73,16 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
-  const segmentsMap = useRef(new Map());
+
+  const [bodySegments, setBodySegments] = useState([]);
 
   useEffect(() => {
     const load = () =>
       fetchNotes()
-        .then((res) => {
-          const newMap = new Map();
-          res.data.forEach((n) => newMap.set(n.id, parseColorTags(n.body)));
-          segmentsMap.current = newMap;
-          setNotes((prev) => {
-            const prevMap = new Map(prev.map((n) => [n.id, n]));
-            return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
-          });
-        })
+        .then((res) => setNotes((prev) => {
+          const prevMap = new Map(prev.map((n) => [n.id, n]));
+          return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
+        }))
         .catch((err) => console.error("Failed to load notes:", err));
     load();
     const id = setInterval(load, 5000);
@@ -102,20 +94,18 @@ function App() {
     const userColor = getColor();
     try {
       if (editingId) {
-        const stored = segmentsMap.current.get(editingId) || [];
-        const wrapped = rebuildBody(body, stored, userColor);
+        const wrapped = rebuildBody(body, bodySegments, userColor);
         const res = await updateNote({ id: editingId, title: title.trim(), body: wrapped });
-        segmentsMap.current.set(editingId, parseColorTags(wrapped));
         setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
         setEditingId(null);
       } else {
         if (!title.trim() && !body.trim()) return;
         const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor });
         const saved = { ...res.data[0], size: "small" };
-        segmentsMap.current.set(saved.id, parseColorTags(res.data[0].body));
         setNotes((prev) => [...prev, saved]);
       }
       setBody("");
+      setBodySegments([]);
       setTitle("");
     } catch (err) {
       console.error("Failed to save note:", err);
@@ -125,7 +115,6 @@ function App() {
   const removeNote = async (id) => {
     try {
       await deleteNote(id, adminToken);
-      segmentsMap.current.delete(id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
@@ -144,10 +133,11 @@ function App() {
   };
 
   const startEdit = (note) => {
+    const segs = parseColorTags(note.body);
     setEditingId(note.id);
     setTitle(note.title);
-    const segs = segmentsMap.current.get(note.id) || [];
-    setBody(segmentsToPlain(segs));
+    setBody(segs.map(s => s.text).join(""));
+    setBodySegments(segs);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -206,7 +196,7 @@ function App() {
         />
         <button type="submit">{editingId ? "Update" : "Post"}</button>
         {editingId && (
-          <button type="button" onClick={() => { setEditingId(null); setBody(""); setTitle(""); }}>
+          <button type="button" onClick={() => { setEditingId(null); setBody(""); setBodySegments([]); setTitle(""); }}>
             Cancel
           </button>
         )}
@@ -216,7 +206,7 @@ function App() {
           <p className="empty">No notes yet — start your collection</p>
         )}
         {notes.map((note) => {
-          const parts = segmentsMap.current.get(note.id) || [];
+          const segments = parseColorTags(note.body);
           return (
             <div key={note.id} className={`note-card ${note.size}`}>
               <div className="card-buttons-top-right">
@@ -229,8 +219,8 @@ function App() {
               <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
                 {note.title && <h2>{note.title}</h2>}
                 <div className="body-colored">
-                  {parts.map((p, i) => (
-                    <span key={i} style={{ color: p.color || "var(--gray-400)" }}>{p.text}</span>
+                  {segments.map((p, i) => (
+                    <span key={i} style={{ color: p.color }}>{p.text}</span>
                   ))}
                 </div>
                 <p className="note-timestamp">
