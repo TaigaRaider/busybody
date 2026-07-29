@@ -54,7 +54,8 @@
   font-size: 14px;
   font-family: var(--sans);
   outline: none;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 
 .note-form input:focus,

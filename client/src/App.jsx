@@ -86,8 +86,8 @@ function App() {
         <textarea
           placeholder="Write something..."
           value={body}
-          rows={3}
           onChange={(e) => setBody(e.target.value)}
+          onInput={(e) => { e.target.style.height = ""; e.target.style.height = e.target.scrollHeight + "px" }}
         />
         <button type="submit">{editingId ? "Update Note" : "Add Note"}</button>
         {editingId && (
