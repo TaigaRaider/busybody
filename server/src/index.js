@@ -34,9 +34,10 @@ app.get("/notes", async (req, res) => {
 
 app.post("/notes", async (req, res) => {
   try {
-    const { title, body, authorColor } = req.body;
+    const { title, text, color } = req.body;
+    const body = JSON.stringify([{ text, color }]);
     const now = new Date().toISOString();
-    const note = await db.insert(notesTable).values({ title, body, authorColor, createdAt: now, updatedAt: now }).returning();
+    const note = await db.insert(notesTable).values({ title, body, authorColor: color, createdAt: now, updatedAt: now }).returning();
     res.status(201).json(note);
   } catch (e) {
     console.error("POST /notes error:", e.cause ?? e);
@@ -46,11 +47,15 @@ app.post("/notes", async (req, res) => {
 
 app.put("/notes", async (req, res) => {
   try {
-    const { id, title, body, editorColor } = req.body;
+    const { id, text, color } = req.body;
+    const existing = await db.select({ body: notesTable.body }).from(notesTable).where(eq(notesTable.id, id)).limit(1);
+    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    const contributions = JSON.parse(existing[0].body || "[]");
+    contributions.push({ text, color });
     const now = new Date().toISOString();
     const note = await db
       .update(notesTable)
-      .set({ title, body, editorColor, updatedAt: now })
+      .set({ body: JSON.stringify(contributions), editorColor: color, updatedAt: now })
       .where(eq(notesTable.id, id))
       .returning();
     res.json(note);

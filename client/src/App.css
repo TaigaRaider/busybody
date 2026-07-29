@@ -15,12 +15,25 @@
 }
 
 .header h1 {
-  display: inline-flex;
   margin: 0;
   font-size: 24px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 4px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .header .subtitle {
@@ -67,6 +80,36 @@
   color: var(--gray-600);
   margin-bottom: 12px;
   letter-spacing: 1px;
+}
+
+.color-picker-modal {
+  text-align: center;
+  padding: 80px 20px;
+}
+.color-picker-modal h2 {
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: 24px;
+}
+.color-picker-grid {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.color-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.color-swatch:hover {
+  transform: scale(1.2);
+  border-color: var(--white);
 }
 
 .note-form {
@@ -162,11 +205,21 @@
   letter-spacing: 1px;
 }
 
-.note-chalk p {
-  color: var(--gray-400);
+.contributions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contribution {
   white-space: pre-wrap;
   word-break: break-word;
   padding-right: 80px;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.5;
 }
 
 .note-card .note-timestamp {

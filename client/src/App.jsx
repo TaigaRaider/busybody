@@ -22,12 +22,24 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
+function parseContributions(body) {
+  if (!body) return [];
+  try {
+    const parsed = JSON.parse(body);
+    return Array.isArray(parsed) ? parsed : [{ text: body, color: null }];
+  } catch {
+    return [{ text: body, color: null }];
+  }
+}
+
 function App() {
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [text, setText] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
+  const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
+  const [pickColor, setPickColor] = useState("");
 
   useEffect(() => {
     const load = () =>
@@ -44,19 +56,20 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() && !body.trim()) return;
+    if (!text.trim()) return;
     try {
       if (editingId) {
-        const res = await updateNote({ id: editingId, title: title.trim(), body: body.trim(), editorColor: getColor() });
+        const res = await updateNote({ id: editingId, text: text.trim(), color: getColor() });
         setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
+        setEditingId(null);
       } else {
-        const res = await createNote({ title: title.trim(), body: body.trim(), authorColor: getColor() });
+        if (!title.trim()) return;
+        const res = await createNote({ title: title.trim(), text: text.trim(), color: getColor() });
         const saved = { ...res.data[0], size: "small" };
         setNotes((prev) => [...prev, saved]);
+        setTitle("");
       }
-      setTitle("");
-      setBody("");
-      setEditingId(null);
+      setText("");
     } catch (err) {
       console.error("Failed to save note:", err);
     }
@@ -82,10 +95,36 @@ function App() {
     );
   };
 
+  const pick = (c) => {
+    localStorage.setItem("userColor", c);
+    setPickColor(c);
+    setShowPicker(false);
+  };
+
+  const myColor = getColor();
+
+  if (showPicker) {
+    return (
+      <div className="notes-app">
+        <div className="color-picker-modal">
+          <h2>pick your chalk</h2>
+          <div className="color-picker-grid">
+            {COLORS.map((c) => (
+              <button key={c} className="color-swatch" style={{ backgroundColor: c }} onClick={() => pick(c)} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="notes-app">
       <header className="header">
-        <h1>TABLOID</h1>
+        <div className="header-row">
+          <h1>TABLOID</h1>
+          <span className="my-color-dot" style={{ backgroundColor: myColor }} title="your chalk" />
+        </div>
         <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
         <div className="admin-bar">
           {adminToken ? (
@@ -97,23 +136,24 @@ function App() {
           )}
         </div>
       </header>
-      {editingId && <p className="editing-status">editing...</p>}
       <form className="note-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+        {!editingId && (
+          <input
+            type="text"
+            placeholder="Topic"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        )}
         <textarea
-          placeholder="Write something..."
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
+          placeholder={editingId ? "Add to this thread..." : "Write something..."}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           onInput={(e) => { e.target.style.height = ""; e.target.style.height = e.target.scrollHeight + "px" }}
         />
-        <button type="submit">{editingId ? "Update Note" : "Add Note"}</button>
+        <button type="submit">{editingId ? "Add to Thread" : "Start Thread"}</button>
         {editingId && (
-          <button type="button" onClick={() => { setEditingId(null); setTitle(""); setBody(""); }}>
+          <button type="button" onClick={() => { setEditingId(null); setText(""); setTitle(""); }}>
             Cancel
           </button>
         )}
@@ -122,52 +162,49 @@ function App() {
         {notes.length === 0 && (
           <p className="empty">No notes yet — start your collection</p>
         )}
-        {notes.map((note) => (
-          <div key={note.id} className={`note-card ${note.size}`}>
-            <div className="card-buttons-top-right">
-              <button
-              className="resize"
-              onClick={() => cycleSize(note.id)}
-              title="Resize"
-            >
-              ◇
-            </button>
-            <button
-              className="edit-button"
-              onClick={() => {
-                setEditingId(note.id);
-                setTitle(note.title);
-                setBody(note.body);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              title="Edit"
-            >
-              ∆
-            </button>
-            {adminToken && (
-              <button
-                className="remove"
-                onClick={() => removeNote(note.id)}
-                title="Delete"
-              >
-                ×
-              </button>
-            )}
+        {notes.map((note) => {
+          const contributions = parseContributions(note.body);
+          return (
+            <div key={note.id} className={`note-card ${note.size}`}>
+              <div className="card-buttons-top-right">
+                <button className="resize" onClick={() => cycleSize(note.id)} title="Resize">◇</button>
+                <button
+                  className="edit-button"
+                  onClick={() => {
+                    setEditingId(note.id);
+                    setTitle(note.title);
+                    setText("");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  title="Add to thread"
+                >
+                  +
+                </button>
+                {adminToken && (
+                  <button className="remove" onClick={() => removeNote(note.id)} title="Delete">×</button>
+                )}
+              </div>
+              <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
+                {note.title && <h2>{note.title}</h2>}
+                <div className="contributions">
+                  {contributions.map((c, i) => (
+                    <p key={i} className="contribution" style={{ color: c.color || "var(--gray-400)" }}>
+                      <span className="chalk-dot" style={{ backgroundColor: c.color || "var(--gray-600)" }} />
+                      {c.text}
+                    </p>
+                  ))}
+                </div>
+                <p className="note-timestamp">
+                  {timeAgo(note.createdAt)}{
+                    note.updatedAt && note.createdAt !== note.updatedAt
+                      ? ` · updated ${timeAgo(note.updatedAt)}`
+                      : ""
+                  }
+                </p>
+              </div>
             </div>
-            <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
-              {note.title && <h2>{note.title}</h2>}
-              <p>{note.body}</p>
-              <p className="note-timestamp">
-                <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
-                {timeAgo(note.createdAt)}{
-                  note.updatedAt && note.createdAt !== note.updatedAt
-                    ? ` · edited ${timeAgo(note.updatedAt)}`
-                    : ""
-                }
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
