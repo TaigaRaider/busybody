@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchNotes, createNote, deleteNote, updateNote } from "./api";
 import "./App.css";
 
@@ -23,7 +23,7 @@ function timeAgo(dateStr) {
 }
 
 function parseColorTags(body) {
-  if (!body) return [{ text: "", color: null }];
+  if (!body) return [];
   const parts = [];
   const re = /\{%\s*([^%]+)\s*\}(.*?)\{%\s*end\s*%\}/gs;
   let last = 0, m;
@@ -33,18 +33,41 @@ function parseColorTags(body) {
     last = re.lastIndex;
   }
   if (last < body.length) parts.push({ text: body.slice(last), color: null });
-  return parts.length ? parts : [{ text: body, color: null }];
+  return parts;
 }
 
-function wrapUntagged(body, color) {
-  return body.replace(/\{%\s*end\s*%\}/g, "{% end %}").replace(
-    /(\{%[^%]+%\}.*?\{%\s*end\s*%\})|(.+?)(?=\{%[^%]+%\}|$)/gs,
-    (_, tagged, untagged) => tagged || `{% ${color} %}${untagged}{% end %}`
-  );
+function segmentsToPlain(segments) {
+  return segments.map(s => s.text).join("");
 }
 
-function stripTags(body) {
-  return body.replace(/\{%\s*[^%]+\s*%\}(.*?)\{%\s*end\s*%\}/gs, "$1");
+function rebuildBody(edited, segments, userColor) {
+  const out = [];
+  let pos = 0;
+  let si = 0;
+  while (pos < edited.length) {
+    const seg = segments[si];
+    if (seg && edited.slice(pos, pos + seg.text.length) === seg.text) {
+      out.push(`{% ${seg.color} %}${seg.text}{% end %}`);
+      pos += seg.text.length;
+      si++;
+    } else if (seg && seg.text.length > 0) {
+      const idx = edited.indexOf(seg.text, pos);
+      if (idx > pos) {
+        out.push(`{% ${userColor} %}${edited.slice(pos, idx)}{% end %}`);
+        pos = idx;
+      } else if (idx === pos) {
+        out.push(`{% ${seg.color} %}${seg.text}{% end %}`);
+        pos += seg.text.length;
+        si++;
+      } else {
+        si++;
+      }
+    } else {
+      out.push(`{% ${userColor} %}${edited.slice(pos)}{% end %}`);
+      pos = edited.length;
+    }
+  }
+  return out.join("");
 }
 
 function App() {
@@ -54,14 +77,20 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
+  const segmentsMap = useRef(new Map());
 
   useEffect(() => {
     const load = () =>
       fetchNotes()
-        .then((res) => setNotes((prev) => {
-          const prevMap = new Map(prev.map((n) => [n.id, n]));
-          return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
-        }))
+        .then((res) => {
+          const newMap = new Map();
+          res.data.forEach((n) => newMap.set(n.id, parseColorTags(n.body)));
+          segmentsMap.current = newMap;
+          setNotes((prev) => {
+            const prevMap = new Map(prev.map((n) => [n.id, n]));
+            return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
+          });
+        })
         .catch((err) => console.error("Failed to load notes:", err));
     load();
     const id = setInterval(load, 5000);
@@ -73,14 +102,17 @@ function App() {
     const userColor = getColor();
     try {
       if (editingId) {
-        const wrapped = wrapUntagged(body, userColor);
+        const stored = segmentsMap.current.get(editingId) || [];
+        const wrapped = rebuildBody(body, stored, userColor);
         const res = await updateNote({ id: editingId, title: title.trim(), body: wrapped });
+        segmentsMap.current.set(editingId, parseColorTags(wrapped));
         setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
         setEditingId(null);
       } else {
         if (!title.trim() && !body.trim()) return;
         const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor });
         const saved = { ...res.data[0], size: "small" };
+        segmentsMap.current.set(saved.id, parseColorTags(res.data[0].body));
         setNotes((prev) => [...prev, saved]);
       }
       setBody("");
@@ -93,6 +125,7 @@ function App() {
   const removeNote = async (id) => {
     try {
       await deleteNote(id, adminToken);
+      segmentsMap.current.delete(id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error("Failed to delete note:", err);
@@ -113,7 +146,8 @@ function App() {
   const startEdit = (note) => {
     setEditingId(note.id);
     setTitle(note.title);
-    setBody(note.body);
+    const segs = segmentsMap.current.get(note.id) || [];
+    setBody(segmentsToPlain(segs));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -182,7 +216,7 @@ function App() {
           <p className="empty">No notes yet — start your collection</p>
         )}
         {notes.map((note) => {
-          const parts = parseColorTags(note.body);
+          const parts = segmentsMap.current.get(note.id) || [];
           return (
             <div key={note.id} className={`note-card ${note.size}`}>
               <div className="card-buttons-top-right">
