@@ -60,9 +60,8 @@ function App() {
   return (
     <div className="notes-app">
       <header className="header">
-        <span className="crown">👑</span>
-        <h1>Notes</h1>
-        <p className="subtitle">Your royal collection</p>
+        <h1>TABLOID</h1>
+        <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
       </header>
       {editingId && <p className="editing-status">editing...</p>}
       <form className="note-form" onSubmit={handleSubmit}>
@@ -91,7 +90,8 @@ function App() {
         )}
         {notes.map((note) => (
           <div key={note.id} className={`note-card ${note.size}`}>
-            <button
+            <div className="card-buttons-top-right">
+              <button
               className="resize"
               onClick={() => cycleSize(note.id)}
               title="Resize"
@@ -117,6 +117,7 @@ function App() {
             >
               ×
             </button>
+            </div>
             {note.title && <h2>{note.title}</h2>}
             <p>{note.body}</p>
           </div>
