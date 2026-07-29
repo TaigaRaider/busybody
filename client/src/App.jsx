@@ -22,24 +22,38 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
-function parseContributions(body) {
-  if (!body) return [];
-  try {
-    const parsed = JSON.parse(body);
-    return Array.isArray(parsed) ? parsed : [{ text: body, color: null }];
-  } catch {
-    return [{ text: body, color: null }];
+function parseColorTags(body) {
+  if (!body) return [{ text: "", color: null }];
+  const parts = [];
+  const re = /\{%\s*([^%]+)\s*\}(.*?)\{%\s*end\s*%\}/gs;
+  let last = 0, m;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) parts.push({ text: body.slice(last, m.index), color: null });
+    parts.push({ text: m[2], color: m[1].trim() });
+    last = re.lastIndex;
   }
+  if (last < body.length) parts.push({ text: body.slice(last), color: null });
+  return parts.length ? parts : [{ text: body, color: null }];
+}
+
+function wrapUntagged(body, color) {
+  return body.replace(/\{%\s*end\s*%\}/g, "{% end %}").replace(
+    /(\{%[^%]+%\}.*?\{%\s*end\s*%\})|(.+?)(?=\{%[^%]+%\}|$)/gs,
+    (_, tagged, untagged) => tagged || `{% ${color} %}${untagged}{% end %}`
+  );
+}
+
+function stripTags(body) {
+  return body.replace(/\{%\s*[^%]+\s*%\}(.*?)\{%\s*end\s*%\}/gs, "$1");
 }
 
 function App() {
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
+  const [body, setBody] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
-  const [pickColor, setPickColor] = useState("");
 
   useEffect(() => {
     const load = () =>
@@ -56,20 +70,21 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    const userColor = getColor();
     try {
       if (editingId) {
-        const res = await updateNote({ id: editingId, text: text.trim(), color: getColor() });
+        const wrapped = wrapUntagged(body, userColor);
+        const res = await updateNote({ id: editingId, title: title.trim(), body: wrapped });
         setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
         setEditingId(null);
       } else {
-        if (!title.trim()) return;
-        const res = await createNote({ title: title.trim(), text: text.trim(), color: getColor() });
+        if (!title.trim() && !body.trim()) return;
+        const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor });
         const saved = { ...res.data[0], size: "small" };
         setNotes((prev) => [...prev, saved]);
-        setTitle("");
       }
-      setText("");
+      setBody("");
+      setTitle("");
     } catch (err) {
       console.error("Failed to save note:", err);
     }
@@ -95,9 +110,15 @@ function App() {
     );
   };
 
+  const startEdit = (note) => {
+    setEditingId(note.id);
+    setTitle(note.title);
+    setBody(note.body);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const pick = (c) => {
     localStorage.setItem("userColor", c);
-    setPickColor(c);
     setShowPicker(false);
   };
 
@@ -137,23 +158,21 @@ function App() {
         </div>
       </header>
       <form className="note-form" onSubmit={handleSubmit}>
-        {!editingId && (
-          <input
-            type="text"
-            placeholder="Topic"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        )}
+        <input
+          type="text"
+          placeholder="Topic"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
         <textarea
-          placeholder={editingId ? "Add to this thread..." : "Write something..."}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          placeholder="Write something..."
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
           onInput={(e) => { e.target.style.height = ""; e.target.style.height = e.target.scrollHeight + "px" }}
         />
-        <button type="submit">{editingId ? "Add to Thread" : "Start Thread"}</button>
+        <button type="submit">{editingId ? "Update" : "Post"}</button>
         {editingId && (
-          <button type="button" onClick={() => { setEditingId(null); setText(""); setTitle(""); }}>
+          <button type="button" onClick={() => { setEditingId(null); setBody(""); setTitle(""); }}>
             Cancel
           </button>
         )}
@@ -163,38 +182,25 @@ function App() {
           <p className="empty">No notes yet — start your collection</p>
         )}
         {notes.map((note) => {
-          const contributions = parseContributions(note.body);
+          const parts = parseColorTags(note.body);
           return (
             <div key={note.id} className={`note-card ${note.size}`}>
               <div className="card-buttons-top-right">
                 <button className="resize" onClick={() => cycleSize(note.id)} title="Resize">◇</button>
-                <button
-                  className="edit-button"
-                  onClick={() => {
-                    setEditingId(note.id);
-                    setTitle(note.title);
-                    setText("");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  title="Add to thread"
-                >
-                  +
-                </button>
+                <button className="edit-button" onClick={() => startEdit(note)} title="Edit">∆</button>
                 {adminToken && (
                   <button className="remove" onClick={() => removeNote(note.id)} title="Delete">×</button>
                 )}
               </div>
               <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
                 {note.title && <h2>{note.title}</h2>}
-                <div className="contributions">
-                  {contributions.map((c, i) => (
-                    <p key={i} className="contribution" style={{ color: c.color || "var(--gray-400)" }}>
-                      <span className="chalk-dot" style={{ backgroundColor: c.color || "var(--gray-600)" }} />
-                      {c.text}
-                    </p>
+                <div className="body-colored">
+                  {parts.map((p, i) => (
+                    <span key={i} style={{ color: p.color || "var(--gray-400)" }}>{p.text}</span>
                   ))}
                 </div>
                 <p className="note-timestamp">
+                  <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
                   {timeAgo(note.createdAt)}{
                     note.updatedAt && note.createdAt !== note.updatedAt
                       ? ` · updated ${timeAgo(note.updatedAt)}`

@@ -205,20 +205,10 @@
   letter-spacing: 1px;
 }
 
-.contributions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.contribution {
+.body-colored {
   white-space: pre-wrap;
   word-break: break-word;
   padding-right: 80px;
-  margin: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
   line-height: 1.5;
 }
 
