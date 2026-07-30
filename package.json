@@ -2,7 +2,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build --prefix client",
     "dev": "node server/src/index.js"
   },
   "dependencies": {
