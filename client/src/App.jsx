@@ -437,8 +437,8 @@ function App() {
         })}
       </div>
       {toast && <div className="toast">{toast}</div>}
-      <Analytics />
-      <SpeedInsights />
+      <Analytics mode={import.meta.env.PROD ? "production" : "development"} />
+      <SpeedInsights sampleRate={1} />
     </div>
   );
 }
