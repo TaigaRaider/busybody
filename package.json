@@ -2,9 +2,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "express": "^4.21.2",
-    "cors": "^2.8.5",
     "@libsql/client": "^0.14.0",
-    "drizzle-orm": "^0.38.0"
+    "@vercel/analytics": "^2.0.1",
+    "cors": "^2.8.5",
+    "drizzle-orm": "^0.45.2",
+    "express": "^4.21.2"
   }
 }

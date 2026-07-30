@@ -1,16 +1,30 @@
+import { Analytics } from "@vercel/analytics/next";
 import { useState, useEffect } from "react";
-import { fetchNotes, createNote, deleteNote, updateNote, rollbackNote, fetchColors } from "./api";
+import {
+  fetchNotes,
+  createNote,
+  deleteNote,
+  updateNote,
+  rollbackNote,
+  fetchColors,
+} from "./api";
 import "./App.css";
 
 function getColor() {
   let c = localStorage.getItem("userColor");
-  if (!c) { c = "#e06c75"; localStorage.setItem("userColor", c) }
+  if (!c) {
+    c = "#e06c75";
+    localStorage.setItem("userColor", c);
+  }
   return c;
 }
 
 function getAuthorId() {
   let id = localStorage.getItem("authorId");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("authorId", id) }
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("authorId", id);
+  }
   return id;
 }
 
@@ -30,13 +44,16 @@ function parseColorTags(body) {
   if (!body) return [];
   const parts = [];
   const re = /\{%\s*([^%]+?)\s*%\}([\s\S]*?)\{%\s*end\s*%\}/g;
-  let last = 0, m;
+  let last = 0,
+    m;
   while ((m = re.exec(body)) !== null) {
-    if (m.index > last) parts.push({ text: body.slice(last, m.index), color: "var(--gray-400)" });
+    if (m.index > last)
+      parts.push({ text: body.slice(last, m.index), color: "var(--gray-400)" });
     parts.push({ text: m[2], color: m[1].trim() });
     last = re.lastIndex;
   }
-  if (last < body.length) parts.push({ text: body.slice(last), color: "var(--gray-400)" });
+  if (last < body.length)
+    parts.push({ text: body.slice(last), color: "var(--gray-400)" });
   return parts;
 }
 
@@ -75,8 +92,12 @@ function App() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [editingId, setEditingId] = useState(null);
-  const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
-  const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
+  const [adminToken, setAdminToken] = useState(
+    () => localStorage.getItem("adminToken") || "",
+  );
+  const [showPicker, setShowPicker] = useState(
+    !localStorage.getItem("userColor"),
+  );
 
   const [bodySegments, setBodySegments] = useState([]);
   const [pickedColor, setPickedColor] = useState("#e06c75");
@@ -86,10 +107,16 @@ function App() {
   useEffect(() => {
     const load = () =>
       fetchNotes()
-        .then((res) => setNotes((prev) => {
-          const prevMap = new Map(prev.map((n) => [n.id, n]));
-          return res.data.map((n) => ({ ...prevMap.get(n.id), ...n, size: prevMap.get(n.id)?.size ?? "small" }));
-        }))
+        .then((res) =>
+          setNotes((prev) => {
+            const prevMap = new Map(prev.map((n) => [n.id, n]));
+            return res.data.map((n) => ({
+              ...prevMap.get(n.id),
+              ...n,
+              size: prevMap.get(n.id)?.size ?? "small",
+            }));
+          }),
+        )
         .catch((err) => console.error("Failed to load notes:", err));
     load();
     const id = setInterval(load, 5000);
@@ -102,12 +129,23 @@ function App() {
     try {
       if (editingId) {
         const wrapped = rebuildBody(body, bodySegments, userColor);
-        const res = await updateNote({ id: editingId, title: title.trim(), body: wrapped });
-        setNotes((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)));
+        const res = await updateNote({
+          id: editingId,
+          title: title.trim(),
+          body: wrapped,
+        });
+        setNotes((prev) =>
+          prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)),
+        );
         setEditingId(null);
       } else {
         if (!title.trim() && !body.trim()) return;
-        const res = await createNote({ title: title.trim(), body: body.trim(), color: userColor, authorId: getAuthorId() });
+        const res = await createNote({
+          title: title.trim(),
+          body: body.trim(),
+          color: userColor,
+          authorId: getAuthorId(),
+        });
         const saved = { ...res.data[0], size: "small" };
         setNotes((prev) => [...prev, saved]);
       }
@@ -131,7 +169,9 @@ function App() {
   const handleRollback = async (id, token) => {
     try {
       const res = await rollbackNote(id, token);
-      setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...res.data[0] } : n)));
+      setNotes((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, ...res.data[0] } : n)),
+      );
     } catch (err) {
       console.error("Failed to rollback:", err);
     }
@@ -139,11 +179,17 @@ function App() {
 
   const myId = getAuthorId();
 
-  const filteredNotes = notes.filter(n => {
+  const filteredNotes = notes.filter((n) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    const plainBody = n.body?.replace(/\{%\s*[^%]+?\s*%\}/g, "").replace(/\{%\s*end\s*%\}/g, "").trim();
-    return (n.title || "").toLowerCase().includes(q) || plainBody?.toLowerCase().includes(q);
+    const plainBody = n.body
+      ?.replace(/\{%\s*[^%]+?\s*%\}/g, "")
+      .replace(/\{%\s*end\s*%\}/g, "")
+      .trim();
+    return (
+      (n.title || "").toLowerCase().includes(q) ||
+      plainBody?.toLowerCase().includes(q)
+    );
   });
 
   const cycleSize = (id) => {
@@ -161,13 +207,16 @@ function App() {
     const segs = parseColorTags(note.body);
     setEditingId(note.id);
     setTitle(note.title);
-    setBody(segs.map(s => s.text).join(""));
+    setBody(segs.map((s) => s.text).join(""));
     setBodySegments(segs);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
-    if (showPicker) fetchColors(getAuthorId()).then(setTakenColors).catch(() => {});
+    if (showPicker)
+      fetchColors(getAuthorId())
+        .then(setTakenColors)
+        .catch(() => {});
   }, [showPicker]);
 
   const isColorTaken = takenColors.includes(pickedColor);
@@ -186,15 +235,24 @@ function App() {
           <h2>pick your chalk</h2>
           <div className="color-wheel-area">
             <label className="color-wheel-label">
-              <input type="color" value={pickedColor} onChange={(e) => setPickedColor(e.target.value)} />
+              <input
+                type="color"
+                value={pickedColor}
+                onChange={(e) => setPickedColor(e.target.value)}
+              />
             </label>
           </div>
-          <div className="picked-preview" style={{ backgroundColor: pickedColor }} />
+          <div
+            className="picked-preview"
+            style={{ backgroundColor: pickedColor }}
+          />
           <div className="color-hex">{pickedColor}</div>
           {isColorTaken ? (
             <p className="color-taken-msg">✗ already claimed</p>
           ) : (
-            <button className="color-confirm" onClick={confirmPick}>Use this chalk</button>
+            <button className="color-confirm" onClick={confirmPick}>
+              Use this chalk
+            </button>
           )}
         </div>
       </div>
@@ -206,7 +264,15 @@ function App() {
       <header className="header">
         <div className="header-row">
           <h1>TABLOID</h1>
-          <span className="my-color-dot" style={{ backgroundColor: myColor }} title="your chalk — click to change" onClick={() => { setShowPicker(true); setPickedColor(myColor) }} />
+          <span
+            className="my-color-dot"
+            style={{ backgroundColor: myColor }}
+            title="your chalk — click to change"
+            onClick={() => {
+              setShowPicker(true);
+              setPickedColor(myColor);
+            }}
+          />
         </div>
         <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
         <div className="search-bar">
@@ -228,7 +294,13 @@ function App() {
             }}
           />
           {adminToken && (
-            <span className="admin-badge" onClick={() => { setAdminToken(""); localStorage.removeItem("adminToken") }}>
+            <span
+              className="admin-badge"
+              onClick={() => {
+                setAdminToken("");
+                localStorage.removeItem("adminToken");
+              }}
+            >
               admin ✕
             </span>
           )}
@@ -245,11 +317,22 @@ function App() {
           placeholder="Write something..."
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          onInput={(e) => { e.target.style.height = ""; e.target.style.height = e.target.scrollHeight + "px" }}
+          onInput={(e) => {
+            e.target.style.height = "";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
         />
         <button type="submit">{editingId ? "Update" : "Post"}</button>
         {editingId && (
-          <button type="button" onClick={() => { setEditingId(null); setBody(""); setBodySegments([]); setTitle(""); }}>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingId(null);
+              setBody("");
+              setBodySegments([]);
+              setTitle("");
+            }}
+          >
             Cancel
           </button>
         )}
@@ -266,32 +349,78 @@ function App() {
           return (
             <div key={note.id} className={`note-card ${note.size}`}>
               <div className="card-buttons-top-right">
-                <button className="resize" onClick={() => cycleSize(note.id)} title="Resize">◇</button>
-                <button className="edit-button" onClick={() => startEdit(note)} title="Edit">∆</button>
-                {(note.authorId === myId) && (
-                  <button className="remove" onClick={() => removeNote(note.id, myId)} title="Delete">×</button>
+                <button
+                  className="resize"
+                  onClick={() => cycleSize(note.id)}
+                  title="Resize"
+                >
+                  ◇
+                </button>
+                <button
+                  className="edit-button"
+                  onClick={() => startEdit(note)}
+                  title="Edit"
+                >
+                  ∆
+                </button>
+                {note.authorId === myId && (
+                  <button
+                    className="remove"
+                    onClick={() => removeNote(note.id, myId)}
+                    title="Delete"
+                  >
+                    ×
+                  </button>
                 )}
                 {adminToken && note.authorId !== myId && (
-                  <button className="remove" onClick={() => removeNote(note.id, adminToken)} title="Delete">×</button>
+                  <button
+                    className="remove"
+                    onClick={() => removeNote(note.id, adminToken)}
+                    title="Delete"
+                  >
+                    ×
+                  </button>
                 )}
                 {(note.authorId === myId || adminToken) && (
-                  <button className="rollback" onClick={() => handleRollback(note.id, note.authorId === myId ? myId : adminToken)} title="Rollback">↩</button>
+                  <button
+                    className="rollback"
+                    onClick={() =>
+                      handleRollback(
+                        note.id,
+                        note.authorId === myId ? myId : adminToken,
+                      )
+                    }
+                    title="Rollback"
+                  >
+                    ↩
+                  </button>
                 )}
               </div>
-              <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
+              <div
+                className="note-chalk"
+                style={{
+                  borderLeftColor: note.authorColor || "var(--gray-600)",
+                }}
+              >
                 {note.title && <h2>{note.title}</h2>}
                 <div className="body-colored">
                   {segments.map((p, i) => (
-                    <span key={i} style={{ color: p.color }}>{p.text}</span>
+                    <span key={i} style={{ color: p.color }}>
+                      {p.text}
+                    </span>
                   ))}
                 </div>
                 <p className="note-timestamp">
-                  <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
-                  {timeAgo(note.createdAt)}{
-                    note.updatedAt && note.createdAt !== note.updatedAt
-                      ? ` · updated ${timeAgo(note.updatedAt)}`
-                      : ""
-                  }
+                  <span
+                    className="chalk-dot"
+                    style={{
+                      backgroundColor: note.authorColor || "var(--gray-600)",
+                    }}
+                  />
+                  {timeAgo(note.createdAt)}
+                  {note.updatedAt && note.createdAt !== note.updatedAt
+                    ? ` · updated ${timeAgo(note.updatedAt)}`
+                    : ""}
                 </p>
               </div>
             </div>
