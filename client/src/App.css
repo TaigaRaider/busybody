@@ -345,6 +345,21 @@
   }
 }
 
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gray-800);
+  color: var(--gray-200);
+  padding: 10px 20px;
+  border: 1px solid var(--gray-700);
+  font-size: 13px;
+  z-index: 1000;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
 @media (max-width: 480px) {
   .notes-app {
     padding: 12px 8px;

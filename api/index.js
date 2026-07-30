@@ -45,7 +45,7 @@ app.get("/notes", async (req, res) => {
     const result = await db.select().from(notes);
     return res.json(result);
   } catch (e) {
-    return res.json({ error: String(e), message: e?.message, stack: e?.stack?.split("\n").slice(0, 5) });
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -124,7 +124,9 @@ app.put("/notes/:id/rollback", async (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: err.message, stack: err.stack?.split("\n").slice(0, 3) });
+  const status = err.status || 500;
+  const message = status === 500 ? "Internal server error" : err.message;
+  res.status(status).json({ error: message });
 });
 
 export default app;

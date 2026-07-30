@@ -1,5 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import { useState, useEffect } from "react";
 import {
   fetchNotes,
@@ -104,6 +104,14 @@ function App() {
   const [pickedColor, setPickedColor] = useState("#e06c75");
   const [takenColors, setTakenColors] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
 
   useEffect(() => {
     const load = () =>
@@ -118,7 +126,7 @@ function App() {
             }));
           }),
         )
-        .catch((err) => console.error("Failed to load notes:", err));
+        .catch(() => setToast("Could not load notes"));
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
@@ -154,7 +162,7 @@ function App() {
       setBodySegments([]);
       setTitle("");
     } catch (err) {
-      console.error("Failed to save note:", err);
+      setToast(err?.response?.data?.error || "Failed to save note");
     }
   };
 
@@ -163,7 +171,7 @@ function App() {
       await deleteNote(id, token);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
-      console.error("Failed to delete note:", err);
+      setToast(err?.response?.data?.error || "Failed to delete note");
     }
   };
 
@@ -174,7 +182,7 @@ function App() {
         prev.map((n) => (n.id === id ? { ...n, ...res.data[0] } : n)),
       );
     } catch (err) {
-      console.error("Failed to rollback:", err);
+      setToast(err?.response?.data?.error || "Failed to rollback");
     }
   };
 
@@ -428,6 +436,9 @@ function App() {
           );
         })}
       </div>
+      {toast && <div className="toast">{toast}</div>}
+      <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
