@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
-import { fetchNotes, createNote, deleteNote, updateNote, rollbackNote } from "./api";
+import { fetchNotes, createNote, deleteNote, updateNote, rollbackNote, fetchColors } from "./api";
 import "./App.css";
-
-const COLORS = ["#e06c75","#61afef","#98c379","#d19a66","#c678dd","#56b6c2","#e5c07b","#be5046","#7ec8e3","#abb2bf","#b9826b","#83a598"];
 
 function getColor() {
   let c = localStorage.getItem("userColor");
-  if (!c) { c = COLORS[Math.floor(Math.random() * COLORS.length)]; localStorage.setItem("userColor", c) }
+  if (!c) { c = "#e06c75"; localStorage.setItem("userColor", c) }
   return c;
 }
 
@@ -81,6 +79,9 @@ function App() {
   const [showPicker, setShowPicker] = useState(!localStorage.getItem("userColor"));
 
   const [bodySegments, setBodySegments] = useState([]);
+  const [pickedColor, setPickedColor] = useState("#e06c75");
+  const [takenColors, setTakenColors] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const load = () =>
@@ -138,6 +139,13 @@ function App() {
 
   const myId = getAuthorId();
 
+  const filteredNotes = notes.filter(n => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const plainBody = n.body?.replace(/\{%\s*[^%]+?\s*%\}/g, "").replace(/\{%\s*end\s*%\}/g, "").trim();
+    return (n.title || "").toLowerCase().includes(q) || plainBody?.toLowerCase().includes(q);
+  });
+
   const cycleSize = (id) => {
     const sizes = ["small", "wide", "tall", "big"];
     setNotes((prev) =>
@@ -158,8 +166,14 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const pick = (c) => {
-    localStorage.setItem("userColor", c);
+  useEffect(() => {
+    if (showPicker) fetchColors(getAuthorId()).then(setTakenColors).catch(() => {});
+  }, [showPicker]);
+
+  const isColorTaken = takenColors.includes(pickedColor);
+  const confirmPick = () => {
+    if (isColorTaken) return;
+    localStorage.setItem("userColor", pickedColor);
     setShowPicker(false);
   };
 
@@ -170,11 +184,18 @@ function App() {
       <div className="notes-app">
         <div className="color-picker-modal">
           <h2>pick your chalk</h2>
-          <div className="color-picker-grid">
-            {COLORS.map((c) => (
-              <button key={c} className="color-swatch" style={{ backgroundColor: c }} onClick={() => pick(c)} />
-            ))}
+          <div className="color-wheel-area">
+            <label className="color-wheel-label">
+              <input type="color" value={pickedColor} onChange={(e) => setPickedColor(e.target.value)} />
+            </label>
           </div>
+          <div className="picked-preview" style={{ backgroundColor: pickedColor }} />
+          <div className="color-hex">{pickedColor}</div>
+          {isColorTaken ? (
+            <p className="color-taken-msg">✗ already claimed</p>
+          ) : (
+            <button className="color-confirm" onClick={confirmPick}>Use this chalk</button>
+          )}
         </div>
       </div>
     );
@@ -185,16 +206,31 @@ function App() {
       <header className="header">
         <div className="header-row">
           <h1>TABLOID</h1>
-          <span className="my-color-dot" style={{ backgroundColor: myColor }} title="your chalk" />
+          <span className="my-color-dot" style={{ backgroundColor: myColor }} title="your chalk — click to change" onClick={() => { setShowPicker(true); setPickedColor(myColor) }} />
         </div>
         <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
-        <div className="admin-bar">
-          {adminToken ? (
-            <button className="admin-logout" onClick={() => { setAdminToken(""); localStorage.removeItem("adminToken") }}>admin</button>
-          ) : (
-            <form className="admin-login" onSubmit={(e) => { e.preventDefault(); const t = e.target.token.value; setAdminToken(t); localStorage.setItem("adminToken", t) }}>
-              <input name="token" type="password" placeholder="admin key" />
-            </form>
+        <div className="search-bar">
+          <input
+            className="search-input"
+            type="text"
+            placeholder="search…"
+            value={searchQuery}
+            onChange={(e) => {
+              const val = e.target.value;
+              const m = val.match(/^!\{([^}]+)\}$/);
+              if (m) {
+                setAdminToken(m[1]);
+                localStorage.setItem("adminToken", m[1]);
+                setSearchQuery("");
+              } else {
+                setSearchQuery(val);
+              }
+            }}
+          />
+          {adminToken && (
+            <span className="admin-badge" onClick={() => { setAdminToken(""); localStorage.removeItem("adminToken") }}>
+              admin ✕
+            </span>
           )}
         </div>
       </header>
@@ -222,7 +258,10 @@ function App() {
         {notes.length === 0 && (
           <p className="empty">No notes yet — start your collection</p>
         )}
-        {notes.map((note) => {
+        {notes.length > 0 && filteredNotes.length === 0 && (
+          <p className="empty">no matches for "{searchQuery}"</p>
+        )}
+        {filteredNotes.map((note) => {
           const segments = parseColorTags(note.body);
           return (
             <div key={note.id} className={`note-card ${note.size}`}>

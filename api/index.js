@@ -29,6 +29,17 @@ const notes = sqliteTable("notes", {
 
 app.get("/ping", (req, res) => res.json({ ok: true }));
 
+app.get("/colors", async (req, res) => {
+  try {
+    const myId = req.query.authorId || "";
+    const all = await db.select({ color: notes.authorColor, authorId: notes.authorId }).from(notes);
+    const taken = [...new Set(all.filter(r => r.color && r.authorId !== myId).map(r => r.color))];
+    res.json(taken);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/notes", async (req, res) => {
   try {
     const result = await db.select().from(notes);
