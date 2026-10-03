@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Only the newest run for a ref matters; cancel superseded ones.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Report every version's result rather than stopping at the first failure.
+      fail-fast: false
+      matrix:
+        # 22 is the oldest supported line (see "engines" in package.json);
+        # 24 is what the suite is developed against locally.
+        node: [22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # The API and its tests need nothing from client/, so they run first and
+      # fail fast without paying for a client install.
+      - name: Install dependencies
+        run: npm ci
+
+      # Exercises the real Express app over HTTP against a throwaway SQLite
+      # file, including the legacy schema upgrade.
+      - name: Test
+        run: npm test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Lint client
+        run: npm --prefix client run lint
+
+      # Catches the class of mistake a passing test suite misses: an unimported
+      # stylesheet or a bad import path still builds, but ships a broken UI.
+      - name: Build client
+        run: npm --prefix client run build
+
+      # The client imports ../../lib/richtext.js, which sits outside the Vercel
+      # root directory (client/). Prove the file is present in a clean checkout
+      # so a deploy cannot fail on a missing module.
+      - name: Check the shared lib/ is reachable from the client build
+        run: test -f lib/richtext.js
