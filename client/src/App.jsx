@@ -1,446 +1,480 @@
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react"
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  fetchNotes,
+  cancelRequest,
   createNote,
+  createSpace,
   deleteNote,
-  updateNote,
+  fetchMe,
+  fetchMentions,
+  fetchNotes,
+  fetchSpaces,
+  requestAccess,
   rollbackNote,
-  fetchColors,
+  setNoteSize,
+  updateNote,
 } from "./api";
+import { clearSession, loadSession, updateStoredUser } from "./session";
+import { parseColorSegments, rebuildColorBody, stripMarkup } from "../../lib/richtext";
+import AuthGate from "./components/AuthGate";
+import Sidebar from "./components/Sidebar";
+import Board from "./components/Board";
+import Moderation from "./components/Moderation";
+import AccessPanel from "./components/AccessPanel";
+import NoteCard from "./components/NoteCard";
+import Toast from "./components/Toast";
 import "./App.css";
 
-function getColor() {
-  let c = localStorage.getItem("userColor");
-  if (!c) {
-    c = "#e06c75";
-    localStorage.setItem("userColor", c);
-  }
-  return c;
-}
+const PAGE = 12;
+const POLL_MS = 5000;
+const SIZES = ["small", "wide", "tall", "big"];
 
-function getAuthorId() {
-  let id = localStorage.getItem("authorId");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("authorId", id);
-  }
-  return id;
-}
+const emptyFeed = { items: [], nextCursor: null, hasMore: false };
 
-function timeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+export default function App() {
+  const [session, setSession] = useState(() => loadSession());
+  const [me, setMe] = useState(null);
+  const [spaces, setSpaces] = useState([]);
+  const [selection, setSelection] = useState({ kind: "lobby" });
+  const [view, setView] = useState("board");
+  const [accessVersion, setAccessVersion] = useState(0);
 
-function parseColorTags(body) {
-  if (!body) return [];
-  const parts = [];
-  const re = /\{%\s*([^%]+?)\s*%\}([\s\S]*?)\{%\s*end\s*%\}/g;
-  let last = 0,
-    m;
-  while ((m = re.exec(body)) !== null) {
-    if (m.index > last)
-      parts.push({ text: body.slice(last, m.index), color: "var(--gray-400)" });
-    parts.push({ text: m[2], color: m[1].trim() });
-    last = re.lastIndex;
-  }
-  if (last < body.length)
-    parts.push({ text: body.slice(last), color: "var(--gray-400)" });
-  return parts;
-}
-
-function rebuildBody(edited, segments, userColor) {
-  const out = [];
-  let pos = 0;
-  let si = 0;
-  while (pos < edited.length) {
-    const seg = segments[si];
-    if (seg && edited.slice(pos, pos + seg.text.length) === seg.text) {
-      out.push(`{% ${seg.color} %}${seg.text}{% end %}`);
-      pos += seg.text.length;
-      si++;
-    } else if (seg && seg.text.length > 0) {
-      const idx = edited.indexOf(seg.text, pos);
-      if (idx > pos) {
-        out.push(`{% ${userColor} %}${edited.slice(pos, idx)}{% end %}`);
-        pos = idx;
-      } else if (idx === pos) {
-        out.push(`{% ${seg.color} %}${seg.text}{% end %}`);
-        pos += seg.text.length;
-        si++;
-      } else {
-        si++;
-      }
-    } else {
-      out.push(`{% ${userColor} %}${edited.slice(pos)}{% end %}`);
-      pos = edited.length;
-    }
-  }
-  return out.join("");
-}
-
-function App() {
   const [notes, setNotes] = useState([]);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [adminToken, setAdminToken] = useState(
-    () => localStorage.getItem("adminToken") || "",
-  );
-  const [showPicker, setShowPicker] = useState(
-    !localStorage.getItem("userColor"),
-  );
+  const [cursor, setCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const [bodySegments, setBodySegments] = useState([]);
-  const [pickedColor, setPickedColor] = useState("#e06c75");
-  const [takenColors, setTakenColors] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [feed, setFeed] = useState(emptyFeed);
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    const load = () =>
-      fetchNotes()
-        .then((res) =>
-          setNotes((prev) => {
-            const prevMap = new Map(prev.map((n) => [n.id, n]));
-            return res.data.map((n) => ({
-              ...prevMap.get(n.id),
-              ...n,
-              size: prevMap.get(n.id)?.size ?? "small",
-            }));
-          }),
-        )
-        .catch(() => setToast("Could not load notes"));
-    load();
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
+  const notify = useCallback((message, kind = "info") => {
+    setToast({ message, kind });
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const userColor = getColor();
-    try {
-      if (editingId) {
-        const wrapped = rebuildBody(body, bodySegments, userColor);
-        const res = await updateNote({
-          id: editingId,
-          title: title.trim(),
-          body: wrapped,
-        });
-        setNotes((prev) =>
-          prev.map((n) => (n.id === editingId ? { ...n, ...res.data[0] } : n)),
-        );
-        setEditingId(null);
-      } else {
-        if (!title.trim() && !body.trim()) return;
-        const res = await createNote({
-          title: title.trim(),
-          body: body.trim(),
-          color: userColor,
-          authorId: getAuthorId(),
-        });
-        const saved = { ...res.data[0], size: "small" };
-        setNotes((prev) => [...prev, saved]);
-      }
-      setBody("");
-      setBodySegments([]);
-      setTitle("");
-    } catch (err) {
-      setToast(err?.response?.data?.error || "Failed to save note");
-    }
-  };
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-  const removeNote = async (id, token) => {
-    try {
-      await deleteNote(id, token);
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-    } catch (err) {
-      setToast(err?.response?.data?.error || "Failed to delete note");
-    }
-  };
-
-  const handleRollback = async (id, token) => {
-    try {
-      const res = await rollbackNote(id, token);
-      setNotes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...res.data[0] } : n)),
-      );
-    } catch (err) {
-      setToast(err?.response?.data?.error || "Failed to rollback");
-    }
-  };
-
-  const myId = getAuthorId();
-
-  const filteredNotes = notes.filter((n) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    const plainBody = n.body
-      ?.replace(/\{%\s*[^%]+?\s*%\}/g, "")
-      .replace(/\{%\s*end\s*%\}/g, "")
-      .trim();
-    return (
-      (n.title || "").toLowerCase().includes(q) ||
-      plainBody?.toLowerCase().includes(q)
-    );
-  });
-
-  const cycleSize = (id) => {
-    const sizes = ["small", "wide", "tall", "big"];
-    setNotes((prev) =>
-      prev.map((n) => {
-        if (n.id !== id) return n;
-        const idx = sizes.indexOf(n.size);
-        return { ...n, size: sizes[(idx + 1) % sizes.length] };
-      }),
-    );
-  };
-
-  const startEdit = (note) => {
-    const segs = parseColorTags(note.body);
-    setEditingId(note.id);
-    setTitle(note.title);
-    setBody(segs.map((s) => s.text).join(""));
-    setBodySegments(segs);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  /* ------------------------------ session ----------------------------- */
 
   useEffect(() => {
-    if (showPicker)
-      fetchColors(getAuthorId())
-        .then(setTakenColors)
-        .catch(() => {});
-  }, [showPicker]);
+    const onSignedOut = () => {
+      clearSession();
+      setSession(null);
+      setMe(null);
+    };
+    window.addEventListener("tabloid:signed-out", onSignedOut);
+    return () => window.removeEventListener("tabloid:signed-out", onSignedOut);
+  }, []);
 
-  const isColorTaken = takenColors.includes(pickedColor);
-  const confirmPick = () => {
-    if (isColorTaken) return;
-    localStorage.setItem("userColor", pickedColor);
-    setShowPicker(false);
+  const refreshSpaces = useCallback(async () => {
+    const list = await fetchSpaces();
+    setSpaces(list);
+    setAccessVersion((v) => v + 1);
+    return list;
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [profile, list] = await Promise.all([fetchMe(), fetchSpaces()]);
+        if (cancelled) return;
+        setMe(profile);
+        setSpaces(list);
+        setAccessVersion((v) => v + 1);
+      } catch (err) {
+        if (!cancelled) notify(err?.response?.data?.error || "Could not sign you in", "error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, notify]);
+
+  /* --------------------------- space selection ------------------------ */
+
+  const spaceId = selection.kind === "space" ? selection.id : null;
+  const space = useMemo(
+    () => (spaceId == null ? null : (spaces.find((s) => s.id === spaceId) || null)),
+    [spaces, spaceId],
+  );
+  const canRead = space ? space.caps.includes("read_notes") : true;
+
+  const selectSpace = (target) => {
+    setView("board");
+    setSelection(target.kind === "lobby" ? { kind: "lobby" } : { kind: "space", id: target.id });
+    setSearch("");
+    setEditing(null);
   };
 
-  const myColor = getColor();
+  /* ------------------------------- notes ------------------------------ */
 
-  if (showPicker) {
+  // `accessVersion` is in the deps as a signal: bumping it re-runs this after a
+  // membership change, so an approved request reveals the notes without a
+  // reload.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Losing read access (a removed membership, a downgrade) empties the
+      // board rather than leaving notes from a space you can no longer see.
+      if (spaceId != null && !canRead) {
+        if (cancelled) return;
+        setNotes([]);
+        setCursor(null);
+        setHasMore(false);
+        return;
+      }
+      try {
+        const page = await fetchNotes({ spaceId, limit: PAGE });
+        if (cancelled) return;
+        setNotes(page.items);
+        setCursor(page.nextCursor);
+        setHasMore(page.hasMore);
+      } catch (err) {
+        if (!cancelled) notify(err?.response?.data?.error || "Could not load notes", "error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceId, canRead, accessVersion, notify]);
+
+  // Poll the newest page only. Older pages already on screen are preserved, and
+  // anything inside the polled window that disappeared (deleted) is dropped.
+  useEffect(() => {
+    if (!session || view !== "board") return undefined;
+    const timer = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const page = await fetchNotes({ spaceId, limit: PAGE });
+        const floor = page.items.length ? page.items[page.items.length - 1].id : Infinity;
+        const incoming = new Map(page.items.map((n) => [n.id, n]));
+        setNotes((prev) => {
+          if (!prev.length) return page.items;
+          return [...page.items, ...prev.filter((n) => !incoming.has(n.id) && n.id < floor)];
+        });
+      } catch {
+        /* transient — the next tick retries */
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [session, view, spaceId]);
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchNotes({ spaceId, cursor, limit: PAGE });
+      setNotes((prev) => {
+        const seen = new Set(prev.map((n) => n.id));
+        return [...prev, ...page.items.filter((n) => !seen.has(n.id))];
+      });
+      setCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not load more", "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  /* ------------------------------ mentions ---------------------------- */
+
+  // Only for the "load more" button; the first page is fetched by the effect
+  // below so that it can cancel cleanly on unmount.
+  const loadMoreFeed = useCallback(async () => {
+    try {
+      const page = await fetchMentions({ cursor: feed.nextCursor, limit: PAGE });
+      setFeed((prev) => ({
+        items: [...prev.items, ...page.items],
+        nextCursor: page.nextCursor,
+        hasMore: page.hasMore,
+      }));
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not load mentions", "error");
+    }
+  }, [feed.nextCursor, notify]);
+
+  useEffect(() => {
+    if (view !== "mentions") return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await fetchMentions({ limit: PAGE });
+        if (!cancelled) setFeed(page);
+      } catch (err) {
+        if (!cancelled) notify(err?.response?.data?.error || "Could not load mentions", "error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view, notify]);
+
+  /* ------------------------------ mutations --------------------------- */
+
+  const handleSubmit = async ({ title, body }) => {
+    setBusy(true);
+    try {
+      if (editing) {
+        // Re-apply per-span colour markup around the edited plain text so other
+        // contributors' chalk survives an edit.
+        const tagged = rebuildColorBody(
+          body,
+          parseColorSegments(editing.body),
+          me?.user?.color || "#ffffff",
+        );
+        const saved = await updateNote(editing.id, { title, body: tagged });
+        setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+        setEditing(null);
+      } else {
+        const created = await createNote({ title, body }, spaceId);
+        setNotes((prev) => [created, ...prev]);
+      }
+      notify(editing ? "Note updated" : "Posted");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not save the note", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = (note) =>
+    setEditing({ id: note.id, title: note.title, body: note.body, plainBody: stripMarkup(note.body) });
+
+  const handleDelete = async (note) => {
+    try {
+      await deleteNote(note.id);
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+      setEditing((current) => (current?.id === note.id ? null : current));
+      notify("Note deleted");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not delete the note", "error");
+    }
+  };
+
+  const handleRollback = async (note) => {
+    try {
+      const saved = await rollbackNote(note.id);
+      setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+      notify("Rolled back one edit");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not roll back", "error");
+    }
+  };
+
+  /** Optimistic resize, persisted per-user so it survives reloads and devices. */
+  const handleResize = async (note) => {
+    const next = SIZES[(SIZES.indexOf(note.size) + 1) % SIZES.length];
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, size: next } : n)));
+    try {
+      await setNoteSize(note.id, next);
+    } catch (err) {
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, size: note.size } : n)));
+      notify(err?.response?.data?.error || "Could not save that layout", "error");
+    }
+  };
+
+  const handleCreateSpace = async (payload) => {
+    try {
+      const created = await createSpace(payload);
+      await refreshSpaces();
+      setSelection({ kind: "space", id: created.id });
+      notify(`${created.name} created`);
+      return created;
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not create the space", "error");
+      return null;
+    }
+  };
+
+  const handleRequestAccess = async (role, message) => {
+    setBusy(true);
+    try {
+      const result = await requestAccess(space.id, { role, message });
+      await refreshSpaces();
+      notify(result.approved ? "You have read access now" : "Request sent to the moderators");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not send the request", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleWithdrawRequest = async () => {
+    if (!space?.pendingRequestId) return;
+    setBusy(true);
+    try {
+      await cancelRequest(space.pendingRequestId);
+      await refreshSpaces();
+      notify("Request withdrawn");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not withdraw the request", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOut = () => {
+    clearSession();
+    setSession(null);
+    setMe(null);
+    setSpaces([]);
+    setNotes([]);
+    setFeed(emptyFeed);
+    setSelection({ kind: "lobby" });
+    setView("board");
+  };
+
+  /* ------------------------------- render ----------------------------- */
+
+  if (!session) {
     return (
-      <div className="notes-app">
-        <div className="color-picker-modal">
-          <h2>pick your chalk</h2>
-          <div className="color-wheel-area">
-            <label className="color-wheel-label">
-              <input
-                type="color"
-                value={pickedColor}
-                onChange={(e) => setPickedColor(e.target.value)}
-              />
-            </label>
-          </div>
-          <div
-            className="picked-preview"
-            style={{ backgroundColor: pickedColor }}
-          />
-          <div className="color-hex">{pickedColor}</div>
-          {isColorTaken ? (
-            <p className="color-taken-msg">✗ already claimed</p>
-          ) : (
-            <button className="color-confirm" onClick={confirmPick}>
-              Use this chalk
-            </button>
-          )}
-        </div>
-      </div>
+      <AuthGate
+        onRegistered={(next) => {
+          setSession(next);
+          updateStoredUser(next.user);
+        }}
+      />
     );
   }
 
+  const user = me?.user || session.user;
+
   return (
-    <div className="notes-app">
-      <header className="header">
-        <div className="header-row">
-          <h1>TABLOID</h1>
-          <span
-            className="my-color-dot"
-            style={{ backgroundColor: myColor }}
-            title="your chalk — click to change"
-            onClick={() => {
-              setShowPicker(true);
-              setPickedColor(myColor);
-            }}
-          />
-        </div>
-        <p className="subtitle">Your Chalk on The Anonymous BlackBoard</p>
-        <div className="search-bar">
-          <input
-            className="search-input"
-            type="text"
-            placeholder="search…"
-            value={searchQuery}
-            onChange={(e) => {
-              const val = e.target.value;
-              const m = val.match(/^!\{([^}]+)\}$/);
-              if (m) {
-                setAdminToken(m[1]);
-                localStorage.setItem("adminToken", m[1]);
-                setSearchQuery("");
-              } else {
-                setSearchQuery(val);
-              }
-            }}
-          />
-          {adminToken && (
-            <span
-              className="admin-badge"
-              onClick={() => {
-                setAdminToken("");
-                localStorage.removeItem("adminToken");
-              }}
-            >
-              admin ✕
-            </span>
+    <div className="shell">
+      <Sidebar
+        user={user}
+        spaces={spaces}
+        selection={selection}
+        onSelect={selectSpace}
+        onCreateSpace={handleCreateSpace}
+        onOpenMentions={() => setView("mentions")}
+        mentionCount={feed.items.length}
+        onSignOut={signOut}
+      />
+
+      <main className="main">
+        <header className="main-head">
+          <div className="main-title">
+            <h1>{view === "mentions" ? "Your mentions" : space ? space.name : "Lobby"}</h1>
+            {view === "mentions" ? (
+              <p className="subtitle">notes where somebody tagged you</p>
+            ) : space ? (
+              <>
+                <p className="subtitle">
+                  {space.description || "no description"}
+                  {" · "}
+                  <span className={`chip subtle ${space.visibility}`}>{space.visibility}</span>
+                  {space.role && (
+                    <span className={`chip subtle ${space.role}`}>you are {space.role}</span>
+                  )}
+                  {typeof space.memberCount === "number" && (
+                    <span className="chip subtle">{space.memberCount} members</span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="subtitle">the open board — everyone can read and post</p>
+            )}
+          </div>
+          {view === "board" && space && (
+            <button type="button" className="ghost" onClick={() => setView("mentions")}>
+              mentions
+            </button>
           )}
-        </div>
-      </header>
-      <form className="note-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Topic"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          placeholder="Write something..."
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onInput={(e) => {
-            e.target.style.height = "";
-            e.target.style.height = e.target.scrollHeight + "px";
-          }}
-        />
-        <button type="submit">{editingId ? "Update" : "Post"}</button>
-        {editingId && (
-          <button
-            type="button"
-            onClick={() => {
-              setEditingId(null);
-              setBody("");
-              setBodySegments([]);
-              setTitle("");
-            }}
-          >
-            Cancel
-          </button>
-        )}
-      </form>
-      <div className="notes-grid">
-        {notes.length === 0 && (
-          <p className="empty">No notes yet — start your collection</p>
-        )}
-        {notes.length > 0 && filteredNotes.length === 0 && (
-          <p className="empty">no matches for "{searchQuery}"</p>
-        )}
-        {filteredNotes.map((note) => {
-          const segments = parseColorTags(note.body);
-          return (
-            <div key={note.id} className={`note-card ${note.size}`}>
-              <div className="card-buttons-top-right">
-                <button
-                  className="resize"
-                  onClick={() => cycleSize(note.id)}
-                  title="Resize"
-                >
-                  ◇
-                </button>
-                <button
-                  className="edit-button"
-                  onClick={() => startEdit(note)}
-                  title="Edit"
-                >
-                  ∆
-                </button>
-                {note.authorId === myId && (
-                  <button
-                    className="remove"
-                    onClick={() => removeNote(note.id, myId)}
-                    title="Delete"
-                  >
-                    ×
-                  </button>
-                )}
-                {adminToken && note.authorId !== myId && (
-                  <button
-                    className="remove"
-                    onClick={() => removeNote(note.id, adminToken)}
-                    title="Delete"
-                  >
-                    ×
-                  </button>
-                )}
-                {(note.authorId === myId || adminToken) && (
-                  <button
-                    className="rollback"
-                    onClick={() =>
-                      handleRollback(
-                        note.id,
-                        note.authorId === myId ? myId : adminToken,
-                      )
-                    }
-                    title="Rollback"
-                  >
-                    ↩
-                  </button>
-                )}
-              </div>
-              <div
-                className="note-chalk"
-                style={{
-                  borderLeftColor: note.authorColor || "var(--gray-600)",
-                }}
-              >
-                {note.title && <h2>{note.title}</h2>}
-                <div className="body-colored">
-                  {segments.map((p, i) => (
-                    <span key={i} style={{ color: p.color }}>
-                      {p.text}
-                    </span>
-                  ))}
-                </div>
-                <p className="note-timestamp">
-                  <span
-                    className="chalk-dot"
-                    style={{
-                      backgroundColor: note.authorColor || "var(--gray-600)",
+          {view === "mentions" && (
+            <button type="button" className="ghost" onClick={() => setView("board")}>
+              back to board
+            </button>
+          )}
+        </header>
+
+        {view === "mentions" ? (
+          <>
+            <div className="mention-feed">
+              {feed.items.length === 0 && (
+                <p className="empty">
+                  nothing yet — tag someone with @handle and it shows up here
+                </p>
+              )}
+              {feed.items.map(({ note }) => (
+                <div key={note.id} className="mention-feed-item">
+                  <p className="mention-where">
+                    in <strong>{note.spaceId ? spaces.find((s) => s.id === note.spaceId)?.name || "a space" : "the Lobby"}</strong>
+                  </p>
+                  <NoteCard
+                    note={note}
+                    onEdit={startEdit}
+                    onDelete={handleDelete}
+                    onRollback={handleRollback}
+                    onResize={handleResize}
+                    onTag={(handle) => {
+                      setSearch(`@${handle}`);
+                      setView("board");
                     }}
                   />
-                  {timeAgo(note.createdAt)}
-                  {note.updatedAt && note.createdAt !== note.updatedAt
-                    ? ` · updated ${timeAgo(note.updatedAt)}`
-                    : ""}
-                </p>
-              </div>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
-      {toast && <div className="toast">{toast}</div>}
-      <Analytics mode={import.meta.env.PROD ? "production" : "development"} />
-      <SpeedInsights sampleRate={1} />
+            {feed.hasMore && (
+              <div className="load-more-wrap">
+                <button type="button" className="load-more" onClick={loadMoreFeed}>
+                  load more
+                </button>
+              </div>
+            )}
+          </>
+        ) : space && !canRead ? (
+          <AccessPanel
+            space={space}
+            pendingRequest={space.pendingRequest}
+            busy={busy}
+            onRequest={handleRequestAccess}
+            onWithdraw={handleWithdrawRequest}
+          />
+        ) : (
+          <>
+            <Board
+              space={space}
+              notes={notes}
+              search={search}
+              onSearch={setSearch}
+              editing={editing}
+              onEdit={startEdit}
+              onCancelEdit={() => setEditing(null)}
+              onSubmit={handleSubmit}
+              onDelete={handleDelete}
+              onRollback={handleRollback}
+              onResize={handleResize}
+              onTag={(handle) => setSearch(`@${handle}`)}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadMore}
+              busy={busy}
+              emptyMessage={
+                space ? "no notes here yet" : "No notes yet — start the collection"
+              }
+            />
+            {space && (
+              <Moderation
+                space={space}
+                caps={space.caps}
+                onChanged={refreshSpaces}
+                notify={notify}
+              />
+            )}
+          </>
+        )}
+      </main>
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
-
-export default App;
