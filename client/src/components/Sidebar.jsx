@@ -66,11 +66,11 @@ export default function Sidebar({
     event.preventDefault();
     if (!currentPassword || newPassword.length < 8 || changingPassword) return;
     setRekeyError(null);
-    const ok = await onChangePassword(currentPassword, newPassword);
+    const result = await onChangePassword(currentPassword, newPassword);
     // Only clear the fields on success; on failure the user needs to retype
     // the current password, and wiping it would make the form look broken.
-    if (ok) closeRekey();
-    else setRekeyError("Could not change the password.");
+    if (result?.ok) closeRekey();
+    else setRekeyError(result?.message || "Could not change the password.");
   };
 
   const mine = spaces.filter((s) => s.role);

@@ -369,7 +369,8 @@ export default function App() {
    * before this runs, and if it ever stopped doing so the very next request
    * would 401 the user straight back out to the auth gate.
    *
-   * Returns a boolean so the sidebar can keep the form open on failure.
+   * Returns `{ ok, message }` so the sidebar can keep the form open and explain
+   * what went wrong, rather than showing a generic failure.
    */
   const handleChangePassword = useCallback(
     async (currentPassword, newPassword) => {
@@ -380,13 +381,12 @@ export default function App() {
         if (current && token) saveSession(current, token);
         setSession((prev) => (prev && token ? { ...prev, token } : prev));
         notify("Password changed — your old token is no longer valid");
-        return true;
+        return { ok: true };
       } catch (err) {
-        notify(
-          err?.response?.data?.error || "Could not change the password",
-          "error",
-        );
-        return false;
+        const message =
+          err?.response?.data?.error || "Could not change the password";
+        notify(message, "error");
+        return { ok: false, message };
       } finally {
         setChangingPassword(false);
       }
