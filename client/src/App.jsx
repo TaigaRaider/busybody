@@ -10,10 +10,11 @@ import {
   fetchSpaces,
   requestAccess,
   rollbackNote,
+  rotateToken,
   setNoteSize,
   updateNote,
 } from "./api";
-import { clearSession, loadSession, updateStoredUser } from "./session";
+import { clearSession, loadSession, saveSession, updateStoredUser } from "./session";
 import { parseColorSegments, rebuildColorBody, stripMarkup } from "../../lib/richtext";
 import AuthGate from "./components/AuthGate";
 import Sidebar from "./components/Sidebar";
@@ -47,6 +48,8 @@ export default function App() {
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [rotatedToken, setRotatedToken] = useState(null);
   const [toast, setToast] = useState(null);
 
   const notify = useCallback((message, kind = "info") => {
@@ -328,16 +331,42 @@ export default function App() {
     setSpaces([]);
     setNotes([]);
     setFeed(emptyFeed);
+    setRotatedToken(null);
     setSelection({ kind: "lobby" });
     setView("board");
   };
+
+  /**
+   * Issues a fresh token and swaps it into both storage and state. Without the
+   * state update the in-memory copy would keep sending the dead token and the
+   * next request would 401 the user straight back out to the auth gate.
+   *
+   * The new token is revealed because rotation kills the old one immediately
+   * and nothing else in the system can show it again — rotate blind and a lost
+   * session is an unrecoverable account.
+   */
+  const handleRotateToken = useCallback(async () => {
+    setRotating(true);
+    try {
+      const { token } = await rotateToken();
+      const current = me?.user || session?.user;
+      if (current) saveSession(current, token);
+      setSession((prev) => (prev ? { ...prev, token } : prev));
+      setRotatedToken(token);
+      notify("Token rotated — the previous one no longer works");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not rotate the token", "error");
+    } finally {
+      setRotating(false);
+    }
+  }, [me, session, notify]);
 
   /* ------------------------------- render ----------------------------- */
 
   if (!session) {
     return (
       <AuthGate
-        onRegistered={(next) => {
+        onAuthenticated={(next) => {
           setSession(next);
           updateStoredUser(next.user);
         }}
@@ -358,6 +387,10 @@ export default function App() {
         onOpenMentions={() => setView("mentions")}
         mentionCount={feed.items.length}
         onSignOut={signOut}
+        onRotateToken={handleRotateToken}
+        rotating={rotating}
+        rotatedToken={rotatedToken}
+        onDismissToken={() => setRotatedToken(null)}
       />
 
       <main className="main">

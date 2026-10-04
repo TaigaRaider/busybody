@@ -234,6 +234,76 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  flex-wrap: wrap;
+}
+
+.token-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--gray-700);
+  background: var(--gray-900);
+}
+
+.token-reveal p {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+
+.token-reveal code {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--white);
+  background: var(--black);
+  padding: 7px 8px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.token-reveal button {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rotate-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rotate-confirm button {
+  padding: 2px 7px;
+  border: 1px solid var(--gray-700);
+  background: var(--gray-800);
+  color: var(--white);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rotate-confirm button:disabled {
+  background: var(--gray-700);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+
+.rotate-confirm .ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--gray-500);
+}
+
+.rotate-confirm .ghost:hover {
+  color: var(--white);
 }
 
 .me-handle {
@@ -328,6 +398,35 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--gray-600);
+}
+
+.gate-tabs {
+  display: flex;
+  margin-bottom: 22px;
+  border: 1px solid var(--gray-700);
+}
+
+.gate-tabs button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--gray-500);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.gate-tabs button.active {
+  background: var(--gray-800);
+  color: var(--white);
+}
+
+.gate-token {
+  resize: vertical;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
 .gate-label {

@@ -10,6 +10,9 @@ const api = axios.create({
 // A 401 means the stored token is dead — drop it so the shell falls back to
 // the auth gate instead of looping on failed requests.
 api.interceptors.request.use((config) => {
+  // A caller-supplied Authorization header wins, so `verifyToken` can test a
+  // pasted token instead of being masked by whatever is already in storage.
+  if (config.headers.Authorization) return config;
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
@@ -34,6 +37,12 @@ const data = (promise) => promise.then((r) => r.data);
 
 export const register = data_ => data(api.post("/auth/register", data_));
 export const fetchMe = () => data(api.get("/auth/me"));
+/**
+ * Checks a pasted token and resolves to the profile it belongs to, so a
+ * returning user can get back in — registration is the only other way in.
+ */
+export const verifyToken = (token) =>
+  data(api.get("/auth/me", { headers: { Authorization: `Bearer ${token}` } }));
 export const updateMe = (patch) => data(api.patch("/auth/me", patch));
 export const rotateToken = () => data(api.post("/auth/rotate-token"));
 export const searchUsers = (q) => data(api.get("/users", { params: { q } }));

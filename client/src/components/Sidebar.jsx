@@ -38,11 +38,16 @@ export default function Sidebar({
   onOpenMentions,
   mentionCount,
   onSignOut,
+  onRotateToken,
+  rotating,
+  rotatedToken,
+  onDismissToken,
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState("private");
+  const [confirmRotate, setConfirmRotate] = useState(false);
 
   const mine = spaces.filter((s) => s.role);
   const discover = spaces.filter((s) => !s.role);
@@ -144,12 +149,49 @@ export default function Sidebar({
       )}
 
       <div className="sidebar-foot">
+        {rotatedToken && (
+          <div className="token-reveal">
+            <p>your new token — copy it now, it is shown only once:</p>
+            <code>{rotatedToken}</code>
+            <button type="button" className="ghost" onClick={onDismissToken}>
+              dismiss
+            </button>
+          </div>
+        )}
         <button type="button" className="mentions-link" onClick={onOpenMentions}>
           mentions{mentionCount ? ` (${mentionCount})` : ""}
         </button>
         <div className="me">
           <span className="chalk-dot" style={{ backgroundColor: user.color }} />
           <span className="me-handle">@{user.handle}</span>
+          {/* Rotation is irreversible and kills the old token immediately, so it
+              is never one stray click away. */}
+          {confirmRotate ? (
+            <span className="rotate-confirm">
+              <button
+                type="button"
+                disabled={rotating}
+                onClick={() => {
+                  setConfirmRotate(false);
+                  onRotateToken();
+                }}
+              >
+                {rotating ? "…" : "rotate"}
+              </button>
+              <button type="button" className="ghost" onClick={() => setConfirmRotate(false)}>
+                no
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setConfirmRotate(true)}
+              title="Rotate token — the current one stops working immediately"
+            >
+              ⟳
+            </button>
+          )}
           <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
             ⏻
           </button>
