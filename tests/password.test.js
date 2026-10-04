@@ -210,7 +210,9 @@ describe("password auth", () => {
         currentPassword: "not-the-password",
         newPassword: NEW_PASSWORD,
       });
-      assert.equal(res.status, 401);
+      // 400, not 401: the caller is authenticated, the supplied password is not
+      // correct. A 401 here would make the client's interceptor sign them out.
+      assert.equal(res.status, 400);
       assert.equal(res.body.code, "BAD_CREDENTIALS");
 
       // The failed attempt must not have changed anything.
@@ -270,6 +272,31 @@ describe("password auth", () => {
       });
       assert.equal(res.status, 400);
       assert.match(res.body.error, /no password/i);
+    });
+
+    it("never answers 401 for a bad input on an authenticated route", async () => {
+      // The client clears its stored token on any 401 and drops to the auth
+      // screen. So a 401 on these routes -- where the caller demonstrably *is*
+      // signed in -- would mean a typo silently signs the user out.
+      const changer = clientFor(server.base);
+      await changer.login("bob", NEW_PASSWORD);
+      const token = changer.token;
+
+      const probes = await Promise.all([
+        changer.post("/auth/change-password", { currentPassword: "nope", newPassword: "another-good-one" }),
+        changer.post("/auth/change-password", { currentPassword: NEW_PASSWORD, newPassword: "short" }),
+        changer.post("/auth/change-password", {}),
+        changer.patch("/auth/me", { color: "rebeccapurple" }),
+        changer.patch("/auth/me", { handle: "Bad Handle" }),
+        changer.post("/spaces", { name: "" }),
+      ]);
+
+      for (const res of probes) {
+        assert.notEqual(res.status, 401, `unexpected 401 from ${JSON.stringify(res.body)}`);
+      }
+
+      // And the session genuinely survived all of that.
+      assert.equal((await clientFor(server.base, token).get("/auth/me")).status, 200);
     });
   });
 });
