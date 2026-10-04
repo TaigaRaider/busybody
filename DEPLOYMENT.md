@@ -232,12 +232,40 @@ those flags instead of re-deriving role logic.
 ```json
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
-  "functions": {
-    "api/index.js": { "maxDuration": 10 }
-  }
+  "cleanUrls": true
 }
 ```
 - Rewrites all requests to `/api` → invokes `api/index.js`
+- No `functions` block: Vercel auto-detects serverless functions.
+- This file is read relative to the **Root Directory**, so it only applies to
+  `tabloid-api`. The frontend's root dir is `client/`, so Vercel looks for
+  `client/vercel.json` and these rewrites never reach the SPA.
+
+### Root Directory — the setting everything else depends on
+One repo, two projects, two different roots. Both are load-bearing:
+
+| Project | Root Directory | Must be, because |
+|----------|----------------|------------------|
+| `busybody` | `client` | `index.html` and `vite.config.js` only exist there |
+| `tabloid-api` | repo root (`.`) | `api/index.js` imports `../lib/app.js` |
+
+Both projects also need **"Include files outside of the Root Directory in the
+Build Step"** enabled (`sourceFilesOutsideRootDirectory`), because the client
+imports `../../lib/richtext` from outside its own root.
+
+**Do not set `tabloid-api`'s root to `api/`.** That is the failure recorded in
+this repo's history: Vercel then runs `npm install` inside `api/`, which has no
+`package.json`, and the build dies with
+
+```
+npm error enoent Could not read package.json: ENOENT: ... '/vercel/path0/api/package.json'
+Error: Command "npm install" exited with 254
+```
+
+The symptom is `readyState: ERROR` with `aliasAssigned: null` — and because the
+deploy fails, the previously-promoted deployment keeps serving stale code while
+the dashboard looks superficially healthy. Check the root dir before assuming a
+code problem.
 
 ### `package.json` (root) — Dependencies for Vercel build
 - `"type": "module"` for ESM
