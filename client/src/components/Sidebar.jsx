@@ -44,6 +44,8 @@ export default function Sidebar({
   onDismissToken,
   onChangePassword,
   changingPassword,
+  drawerOpen,
+  onCloseDrawer,
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -89,187 +91,214 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-mark">T</span>
-        <div>
-          <strong>TABLOID</strong>
-          <span className="brand-sub">anonymous blackboard</span>
+    <aside className={`sidebar ${drawerOpen ? "drawer-open" : ""}`}>
+      {/* On a phone this is the only permanently visible chrome: a sticky strip
+          holding the masthead. Everything navigable moved into the drawer below,
+          because the full sidebar used to stack above the notes and push the
+          first one below the fold. On desktop the top bar is the masthead and the
+          panel is the sidebar, which is how it always looked. */}
+      <div className="topbar">
+        <div className="brand">
+          <span className="brand-mark">T</span>
+          <div>
+            <strong>TABLOID</strong>
+            <span className="brand-sub">anonymous blackboard</span>
+          </div>
         </div>
+        <button
+          type="button"
+          className="drawer-close"
+          onClick={onCloseDrawer}
+          aria-label="Close spaces"
+        >
+          &#10005;
+        </button>
       </div>
 
-      <button
-        type="button"
-        className={`lobby-row ${selection.kind === "lobby" ? "active" : ""}`}
-        onClick={() => onSelect({ kind: "lobby" })}
-      >
-        Lobby
-        <span className="chip subtle">open</span>
-      </button>
-
-      <nav className="space-groups">
-        <div className="group">
-          <h3>your spaces</h3>
-          {mine.length === 0 && <p className="group-empty">none yet</p>}
-          <ul>
-            {mine.map((s) => (
-              <SpaceRow
-                key={s.id}
-                space={s}
-                active={activeId === s.id}
-                onSelect={onSelect}
-              />
-            ))}
-          </ul>
-        </div>
-
-        <div className="group">
-          <h3>discover</h3>
-          <p className="group-hint">visible, but locked until you ask</p>
-          {discover.length === 0 && <p className="group-empty">nothing to discover</p>}
-          <ul>
-            {discover.map((s) => (
-              <SpaceRow
-                key={s.id}
-                space={s}
-                active={activeId === s.id}
-                onSelect={onSelect}
-              />
-            ))}
-          </ul>
-        </div>
-      </nav>
-
-      {creating ? (
-        <form className="space-create" onSubmit={submit}>
-          <input
-            autoFocus
-            placeholder="space name"
-            value={name}
-            maxLength={80}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            placeholder="what is it for? (optional)"
-            value={description}
-            maxLength={300}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-            <option value="private">private — request to read or post</option>
-            <option value="public">public — anyone can read</option>
-          </select>
-          <div className="row">
-            <button type="submit">create</button>
-            <button type="button" className="ghost" onClick={() => setCreating(false)}>
-              cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button type="button" className="space-new" onClick={() => setCreating(true)}>
-          + new space
+      <div className="sidebar-panel">
+        <button
+          type="button"
+          className={`lobby-row ${selection.kind === "lobby" ? "active" : ""}`}
+          onClick={() => onSelect({ kind: "lobby" })}
+        >
+          Lobby
+          <span className="chip subtle">open</span>
         </button>
-      )}
 
-      <div className="sidebar-foot">
-        {rotatedToken && (
-          <div className="token-reveal">
-            <p>your new token — copy it now, it is shown only once:</p>
-            <code>{rotatedToken}</code>
-            <button type="button" className="ghost" onClick={onDismissToken}>
-              dismiss
-            </button>
-          </div>
-        )}
-        <button type="button" className="mentions-link" onClick={onOpenMentions}>
-          mentions{mentionCount ? ` (${mentionCount})` : ""}
-        </button>
-        <div className="me">
-          <span className="chalk-dot" style={{ backgroundColor: user.color }} />
-          <span className="me-handle">@{user.handle}</span>
-          {/* Rotation is irreversible and kills the old token immediately, so it
-              is never one stray click away. */}
-          {confirmRotate ? (
-            <span className="rotate-confirm">
-              <button
-                type="button"
-                disabled={rotating}
-                onClick={() => {
-                  setConfirmRotate(false);
-                  onRotateToken();
-                }}
-              >
-                {rotating ? "…" : "rotate"}
-              </button>
-              <button type="button" className="ghost" onClick={() => setConfirmRotate(false)}>
-                no
-              </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => setConfirmRotate(true)}
-              title="Rotate token — the current one stops working immediately"
-            >
-              ⟳
-            </button>
+        <nav className="space-groups">
+          {/* Empty groups are not rendered at all. Both headings used to show
+              regardless, which spent ~122px of a phone screen on "none yet" and
+              "nothing to discover" for somebody with no spaces. */}
+          {mine.length > 0 && (
+            <div className="group">
+              <h3>your spaces</h3>
+              <ul>
+                {mine.map((s) => (
+                  <SpaceRow
+                    key={s.id}
+                    space={s}
+                    active={activeId === s.id}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </ul>
+            </div>
           )}
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setRekeying((open) => !open)}
-            title="Change your password"
-          >
-            🔑
-          </button>
-          <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
-            ⏻
-          </button>
-        </div>
 
-        {rekeying && (
-          <form className="rekey" onSubmit={submitRekey}>
-            <p className="rekey-title">change your password</p>
+          {discover.length > 0 && (
+            <div className="group">
+              <h3>discover</h3>
+              <p className="group-hint">visible, but locked until you ask</p>
+              <ul>
+                {discover.map((s) => (
+                  <SpaceRow
+                    key={s.id}
+                    space={s}
+                    active={activeId === s.id}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+        </nav>
+
+        {creating ? (
+          <form className="space-create" onSubmit={submit}>
             <input
-              className="gate-input"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="current password"
-              autoComplete="current-password"
               autoFocus
-              spellCheck={false}
+              placeholder="space name"
+              value={name}
+              maxLength={80}
+              onChange={(e) => setName(e.target.value)}
             />
             <input
-              className="gate-input"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="new password (8+ characters)"
-              autoComplete="new-password"
-              spellCheck={false}
+              placeholder="what is it for? (optional)"
+              value={description}
+              maxLength={300}
+              onChange={(e) => setDescription(e.target.value)}
             />
-            <p className="rekey-note">
-              Your current token is retired as part of this, so keep this window
-              open — it re-signs-in with the new token automatically.
-            </p>
-            {rekeyError && <p className="gate-error">{rekeyError}</p>}
-            <div className="rekey-actions">
-              <button
-                type="submit"
-                disabled={!currentPassword || newPassword.length < 8 || changingPassword}
-              >
-                {changingPassword ? "saving…" : "save"}
-              </button>
-              <button type="button" className="ghost" onClick={closeRekey}>
+            <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+              <option value="private">private — request to read or post</option>
+              <option value="public">public — anyone can read</option>
+            </select>
+            <div className="row">
+              <button type="submit">create</button>
+              <button type="button" className="ghost" onClick={() => setCreating(false)}>
                 cancel
               </button>
             </div>
           </form>
+        ) : (
+          <button type="button" className="space-new" onClick={() => setCreating(true)}>
+            + new space
+          </button>
         )}
+
+        <div className="sidebar-foot">
+          {rotatedToken && (
+            <div className="token-reveal">
+              <p>your new token — copy it now, it is shown only once:</p>
+              <code>{rotatedToken}</code>
+              <button type="button" className="ghost" onClick={onDismissToken}>
+                dismiss
+              </button>
+            </div>
+          )}
+          <button type="button" className="mentions-link" onClick={onOpenMentions}>
+            mentions{mentionCount ? ` (${mentionCount})` : ""}
+          </button>
+          <div className="me">
+            <span className="chalk-dot" style={{ backgroundColor: user.color }} />
+            <span className="me-handle">@{user.handle}</span>
+            {/* Rotation is irreversible and kills the old token immediately, so it
+                is never one stray click away. */}
+            {confirmRotate ? (
+              <span className="rotate-confirm">
+                <button
+                  type="button"
+                  disabled={rotating}
+                  onClick={() => {
+                    setConfirmRotate(false);
+                    onRotateToken();
+                  }}
+                >
+                  {rotating ? "…" : "rotate"}
+                </button>
+                <button type="button" className="ghost" onClick={() => setConfirmRotate(false)}>
+                  no
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setConfirmRotate(true)}
+                title="Rotate token — the current one stops working immediately"
+              >
+                ⟳
+              </button>
+            )}
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setRekeying((open) => !open)}
+              title="Change your password"
+            >
+              🔑
+            </button>
+            <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
+              ⏻
+            </button>
+          </div>
+
+          {rekeying && (
+            <form className="rekey" onSubmit={submitRekey}>
+              <p className="rekey-title">change your password</p>
+              <input
+                className="gate-input"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="current password"
+                autoComplete="current-password"
+                autoFocus
+                spellCheck={false}
+              />
+              <input
+                className="gate-input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="new password (8+ characters)"
+                autoComplete="new-password"
+                spellCheck={false}
+              />
+              <p className="rekey-note">
+                Your current token is retired as part of this, so keep this window
+                open — it re-signs-in with the new token automatically.
+              </p>
+              {rekeyError && <p className="gate-error">{rekeyError}</p>}
+              <div className="rekey-actions">
+                <button
+                  type="submit"
+                  disabled={!currentPassword || newPassword.length < 8 || changingPassword}
+                >
+                  {changingPassword ? "saving…" : "save"}
+                </button>
+                <button type="button" className="ghost" onClick={closeRekey}>
+                  cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
+
+      {/* Dismissal by tapping outside. Decorative for assistive tech, which can
+          already dismiss via the close button or Escape; rendered only while open,
+          and App gates `drawerOpen` on the mobile breakpoint, so desktop is safe. */}
+      {drawerOpen && <div className="drawer-scrim" onClick={onCloseDrawer} aria-hidden="true" />}
     </aside>
   );
 }

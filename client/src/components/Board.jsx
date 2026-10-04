@@ -25,6 +25,9 @@ export default function Board({
   onLoadMore,
   busy,
   emptyMessage,
+  composerCollapsed,
+  onExpandComposer,
+  onCollapseComposer,
 }) {
   const canPost = space ? space.caps.includes("create_note") : true;
 
@@ -47,6 +50,9 @@ export default function Board({
           busy={busy}
           onSubmit={onSubmit}
           onCancel={onCancelEdit}
+          collapsed={composerCollapsed}
+          onExpand={onExpandComposer}
+          onCollapse={onCollapseComposer}
         />
       ) : (
         <p className="board-readonly">

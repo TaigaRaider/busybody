@@ -23,7 +23,10 @@ import Board from "./components/Board";
 import Moderation from "./components/Moderation";
 import AccessPanel from "./components/AccessPanel";
 import NoteCard from "./components/NoteCard";
+import TabBar from "./components/TabBar";
 import Toast from "./components/Toast";
+import useMediaQuery from "./hooks/useMediaQuery";
+import { MOBILE_QUERY } from "./layout";
 import "./App.css";
 
 const PAGE = 12;
@@ -53,6 +56,43 @@ export default function App() {
   const [rotatedToken, setRotatedToken] = useState(null);
   const [changingPassword, setChangingPassword] = useState(false);
   const [toast, setToast] = useState(null);
+
+  /* --------------------------- mobile chrome -------------------------- */
+
+  // Drives the bottom bar, the nav drawer and the collapsible composer. The
+  // value is pinned to the same breakpoint the CSS uses — see layout.js for why
+  // there is only one of them.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  // Derived, not stored. An effect that force-closed the drawer on widening would
+  // leave a frame where a fixed overlay is stranded over a desktop sidebar that
+  // has no way to dismiss it. Gating the value instead means `true` can only ever
+  // describe a drawer that is actually on screen.
+  const drawerVisible = isMobile && drawerOpen;
+
+  // Escape closes the drawer. Phones have no Escape key, but tablets with
+  // keyboards make this worth wiring.
+  useEffect(() => {
+    if (!drawerVisible) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawerVisible]);
+
+  // Hold the page still behind the drawer, and stop iOS from scrolling the
+  // board underneath a touch that was meant for the scrim.
+  useEffect(() => {
+    if (!drawerVisible) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [drawerVisible]);
 
   const notify = useCallback((message, kind = "info") => {
     setToast({ message, kind });
@@ -110,12 +150,18 @@ export default function App() {
     [spaces, spaceId],
   );
   const canRead = space ? space.caps.includes("read_notes") : true;
+  // Mirrors Board's own check so the bottom bar can omit Post for a reader
+  // rather than offering a button that only reveals a "you cannot post here".
+  const canPost = space ? space.caps.includes("create_note") : true;
 
   const selectSpace = (target) => {
     setView("board");
     setSelection(target.kind === "lobby" ? { kind: "lobby" } : { kind: "space", id: target.id });
     setSearch("");
     setEditing(null);
+    // Choosing a space is the end of the mobile navigation gesture; leaving the
+    // drawer hanging open over the board it just navigated to would be a bug.
+    setDrawerOpen(false);
   };
 
   /* ------------------------------- notes ------------------------------ */
@@ -243,6 +289,9 @@ export default function App() {
         setNotes((prev) => [created, ...prev]);
       }
       notify(editing ? "Note updated" : "Posted");
+      // The note is now the top of the board, so put the form away and hand the
+      // screen back to the content instead of leaving an empty editor there.
+      setComposerOpen(false);
     } catch (err) {
       notify(err?.response?.data?.error || "Could not save the note", "error");
     } finally {
@@ -409,6 +458,21 @@ export default function App() {
 
   const user = me?.user || session.user;
 
+  // Every route into mentions and the composer has to leave the drawer closed,
+  // because on a phone those are both things the drawer was covering.
+  const openMentions = () => {
+    setView("mentions");
+    setDrawerOpen(false);
+  };
+
+  const openComposer = () => {
+    setComposerOpen(true);
+    // The composer sits at the top of the board and the reader is most likely
+    // scrolled well past it.
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  };
+
   return (
     <div className="shell">
       <Sidebar
@@ -417,7 +481,7 @@ export default function App() {
         selection={selection}
         onSelect={selectSpace}
         onCreateSpace={handleCreateSpace}
-        onOpenMentions={() => setView("mentions")}
+        onOpenMentions={openMentions}
         mentionCount={feed.items.length}
         onSignOut={signOut}
         onRotateToken={handleRotateToken}
@@ -426,6 +490,8 @@ export default function App() {
         onDismissToken={() => setRotatedToken(null)}
         onChangePassword={handleChangePassword}
         changingPassword={changingPassword}
+        drawerOpen={drawerVisible}
+        onCloseDrawer={() => setDrawerOpen(false)}
       />
 
       <main className="main">
@@ -529,6 +595,9 @@ export default function App() {
               emptyMessage={
                 space ? "no notes here yet" : "No notes yet — start the collection"
               }
+              composerCollapsed={isMobile && !composerOpen}
+              onExpandComposer={openComposer}
+              onCollapseComposer={() => setComposerOpen(false)}
             />
             {space && (
               <Moderation
@@ -541,6 +610,16 @@ export default function App() {
           </>
         )}
       </main>
+
+      {isMobile && (
+        <TabBar
+          onOpenSpaces={() => setDrawerOpen(true)}
+          onPost={openComposer}
+          onOpenMentions={openMentions}
+          mentionCount={feed.items.length}
+          canPost={canPost && view !== "mentions"}
+        />
+      )}
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>

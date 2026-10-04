@@ -59,6 +59,42 @@
   overflow-y: auto;
 }
 
+/* Desktop: the sidebar is still one column, just split into the masthead strip
+   and the navigable panel below it so the strip can become sticky on a phone.
+   The 18px gap between the two reproduces the gap the brand used to have from
+   the Lobby row. */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+}
+
+.drawer-close {
+  display: none;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  background: none;
+  border: 1px solid var(--gray-700);
+  color: var(--gray-400);
+  font-size: 15px;
+  font-family: var(--sans);
+  cursor: pointer;
+}
+
+.drawer-scrim {
+  display: none;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -139,8 +175,7 @@
   color: var(--gray-600);
 }
 
-.group-hint,
-.group-empty {
+.group-hint {
   margin: 0 0 6px;
   font-size: 10px;
   color: var(--gray-700);
@@ -580,6 +615,39 @@
   flex-direction: column;
   gap: 8px;
   margin-bottom: 20px;
+}
+
+/* The phone stand-in for the composer. The real form measured 170px of the
+   first screen whether or not you meant to write; this is one tap. */
+.composer-collapsed {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  background: var(--gray-900);
+  border: 1px dashed var(--gray-600);
+  color: var(--gray-400);
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.composer-collapsed-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gray-600);
+  color: var(--white);
+  font-size: 17px;
+  line-height: 1;
 }
 
 .note-form > input,
@@ -1147,6 +1215,103 @@ button.ghost.danger:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * bottom bar
+ *
+ * Rendered by TabBar.jsx only below the breakpoint in layout.js, which is the
+ * same 760px the responsive block below uses. Kept here rather than inside the
+ * media query so the sizes are visible in one place; the only thing that hides
+ * it on desktop is React declining to render it at all.
+ * ------------------------------------------------------------------ */
+
+:root {
+  --tabbar-h: 58px;
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  display: flex;
+  align-items: stretch;
+  background: var(--gray-900);
+  border-top: 1px solid var(--gray-700);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  position: relative;
+  flex: 1;
+  min-height: var(--tabbar-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tab-glyph {
+  font-size: 19px;
+  line-height: 1;
+  color: var(--gray-400);
+}
+
+.tab-primary {
+  color: var(--white);
+}
+
+.tab-primary .tab-glyph {
+  color: var(--white);
+  font-size: 21px;
+}
+
+/* Balances the bar when Post is unavailable for a reader. */
+.tab-spacer {
+  flex: 1;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 5px;
+  right: 50%;
+  margin-right: -24px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--black);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Visible to screen readers, not to layout. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ *
  * responsive
  * ------------------------------------------------------------------ */
 
@@ -1160,30 +1325,87 @@ button.ghost.danger:hover {
   }
 }
 
+/* 760px is the same value as MOBILE_MAX in client/src/layout.js, and the two
+   have to agree. This block decides how the board is laid out; React state
+   decides which chrome exists. A mismatch renders a bottom bar underneath a
+   desktop sidebar, or a drawer that nothing can dismiss. */
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: 1fr;
   }
 
+  /* The sidebar shrinks to a sticky masthead strip and everything navigable
+     becomes a drawer. This is the fix for the measured problem: the old layout
+     stacked 338px of navigation above the notes, so the first card began at
+     687px in a 686px viewport and no note was visible without scrolling. */
   .sidebar {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 30;
     height: auto;
+    overflow: visible;
+    padding: 0;
     border-right: none;
     border-bottom: 1px solid var(--gray-700);
+    background: var(--black);
   }
 
+  .topbar {
+    padding: 8px 12px;
+    gap: 10px;
+  }
+
+  .drawer-close {
+    display: grid;
+    place-items: center;
+  }
+
+  .sidebar-panel {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: min(84vw, 320px);
+    padding: 16px 14px calc(24px + env(safe-area-inset-bottom));
+    background: var(--black);
+    border-right: 1px solid var(--gray-700);
+    overflow-y: auto;
+    transform: translateX(-100%);
+    /* visibility as well as transform: an off-screen panel still takes focus,
+       which would drop keyboard and screen-reader users into an invisible menu. */
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0.22s;
+  }
+
+  .sidebar.drawer-open .sidebar-panel {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.6);
+  }
+
+  /* Groups stack again. They only ever became a sideways scroller because the
+     old strip was short and wide; the drawer has height to spare. */
   .space-groups {
-    flex-direction: row;
-    gap: 20px;
-    overflow-x: auto;
-  }
-
-  .group {
-    min-width: 180px;
+    flex-direction: column;
+    gap: 18px;
+    overflow-x: visible;
   }
 
   .main {
-    padding: 20px 12px 48px;
+    /* Clears the fixed bottom bar and the iPhone home indicator. */
+    padding: 18px 12px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 28px);
+  }
+
+  .main-head {
+    margin-bottom: 18px;
   }
 
   .main-title h1 {
@@ -1191,13 +1413,23 @@ button.ghost.danger:hover {
     letter-spacing: 2px;
   }
 
+  /* One column. Two columns at 390px left ~180px cards, and bodies that narrow
+     wrap into very tall thin ribbons — 719px for a single card at 377px wide
+     before narrowing further. */
   .notes-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  .note-card.tall,
+  /* Reset the two-column spans from the tablet block, or they would ask a
+     single-column grid for columns that do not exist. */
+  .note-card.wide,
   .note-card.big {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+
+  .note-card.tall {
     grid-row: span 1;
   }
 
@@ -1210,17 +1442,38 @@ button.ghost.danger:hover {
     padding-right: 58px;
   }
 
+  /* Stay permanently visible — there is no hover on touch — but sized to a
+     usable target instead of a desktop-sized one. */
   .note-card .remove,
   .note-card .resize,
   .note-card .edit-button,
   .note-card .rollback {
     opacity: 1;
+    min-width: 34px;
+    min-height: 34px;
     padding: 5px 6px;
     font-size: 14px;
+  }
+
+  /* The bottom bar is the mentions affordance now; two would be noise. */
+  .mentions-link {
+    display: none;
+  }
+
+  .lobby-row,
+  .space-row,
+  .space-new {
+    min-height: 44px;
   }
 
   .composer-hint,
   .search-count {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-panel {
+    transition: none;
   }
 }
