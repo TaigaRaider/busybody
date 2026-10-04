@@ -83,10 +83,22 @@ export function clientFor(base, token = null) {
     put: (path, body) => call("PUT", path, body),
     patch: (path, body) => call("PATCH", path, body),
     del: (path) => call("DELETE", path),
-    /** Registers and keeps the returned token for later calls. */
-    async register(handle, color) {
-      const res = await call("POST", "/auth/register", { handle, color });
+    /**
+     * Registers and keeps the returned token for later calls.
+     *
+     * Registration requires a password, so every account the suite creates has
+     * one. The default is deliberately not the account's own handle — a test
+     * that accidentally authenticates against the wrong field should fail.
+     */
+    async register(handle, color, password = "correct-horse-battery") {
+      const res = await call("POST", "/auth/register", { handle, color, password });
       if (res.status === 201) state.token = res.body.token;
+      return res;
+    },
+    /** Signs in and adopts the returned token, exactly as the browser will. */
+    async login(handle, password) {
+      const res = await call("POST", "/auth/login", { handle, password });
+      if (res.status === 200) state.token = res.body.token;
       return res;
     },
   };
@@ -104,16 +116,24 @@ export const PALETTE = [
 ];
 
 /** Registers `count` throwaway accounts and returns one client per handle. */
+export const TEST_PASSWORD = "correct-horse-battery";
+
 export async function makeUsers(base, count) {
   const clients = [];
   for (let i = 0; i < count; i += 1) {
     const handle = `user${i}`;
     const api = clientFor(base);
-    const res = await api.register(handle, PALETTE[i % PALETTE.length]);
+    const res = await api.register(handle, PALETTE[i % PALETTE.length], TEST_PASSWORD);
     if (res.status !== 201) {
       throw new Error(`could not register ${handle}: ${JSON.stringify(res.body)}`);
     }
-    clients.push({ handle, api, user: res.body.user, token: res.body.token });
+    clients.push({
+      handle,
+      api,
+      user: res.body.user,
+      token: res.body.token,
+      password: TEST_PASSWORD,
+    });
   }
   return clients;
 }

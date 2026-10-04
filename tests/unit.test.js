@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  hashPassword,
+  isAcceptablePassword,
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  verifyPassword,
+} from "../lib/auth.js";
+import {
   extractHandles,
   isValidHandle,
   normalizeColor,
@@ -130,6 +137,77 @@ describe("richtext", () => {
 
   it("strips markup but keeps tags", () => {
     assert.equal(stripMarkup("{% #fff %}a{% end %}b"), "ab");
+  });
+});
+
+describe("password hashing", () => {
+  it("round-trips a password", async () => {
+    const stored = await hashPassword("correct horse battery staple");
+    assert.ok(await verifyPassword("correct horse battery staple", stored));
+    assert.ok(!(await verifyPassword("correct horse battery stapl", stored)));
+  });
+
+  it("salts, so the same password hashes differently every time", async () => {
+    const a = await hashPassword("same password");
+    const b = await hashPassword("same password");
+    assert.notEqual(a, b);
+    // ...but both still verify, which is the point of salting.
+    assert.ok(await verifyPassword("same password", a));
+    assert.ok(await verifyPassword("same password", b));
+  });
+
+  it("records its own parameters and never the password", async () => {
+    const stored = await hashPassword("hunter2");
+    assert.match(stored, /^scrypt\$\d+\$\d+\$\d+\$[\w+/=]+\$[\w+/=]+$/);
+    assert.ok(!stored.includes("hunter2"));
+  });
+
+  it("refuses an account that has no password set", async () => {
+    // This is the anon-* placeholder case from the legacy migration: a null
+    // credential must fail closed, never throw or return true.
+    assert.equal(await verifyPassword("anything", null), false);
+    assert.equal(await verifyPassword("anything", undefined), false);
+    assert.equal(await verifyPassword("anything", ""), false);
+  });
+
+  it("refuses malformed or tampered stored hashes", async () => {
+    const stored = await hashPassword("hunter2");
+    const parts = stored.split("$");
+
+    const tampered = [...parts];
+    // Flip the final hash byte.
+    const raw = Buffer.from(parts[5], "base64");
+    raw[0] ^= 0xff;
+    tampered[5] = raw.toString("base64");
+    assert.equal(await verifyPassword("hunter2", tampered.join("$")), false);
+
+    // A different salt must not verify.
+    assert.equal(await verifyPassword("hunter2", [parts[0], parts[1], parts[2], parts[3], Buffer.alloc(16).toString("base64"), parts[5]].join("$")), false);
+
+    for (const bad of [
+      "not-a-hash",
+      "scrypt$1$8$1$onlyfour",
+      "bcrypt$32768$8$1$c2FsdA==$aGFzaA==",
+      "scrypt$0$8$1$c2FsdA==$aGFzaA==",
+      // N this large would try to allocate ~8 GB; it must be refused, not run.
+      `scrypt$${1 << 25}$8$1$c2FsdA==$aGFzaA==`,
+      "scrypt$abc$8$1$c2FsdA==$aGFzaA==",
+      `scrypt$32768$8$1$c2FsdA==`,
+      `scrypt$32768$8$1$c2FsdA==$aGFzaA==$extra`,
+      `scrypt$32768$8$1$$aGFzaA==`,
+    ]) {
+      assert.equal(await verifyPassword("hunter2", bad), false, `should reject ${bad}`);
+    }
+  });
+
+  it("enforces the length policy at the boundaries", async () => {
+    assert.ok(!isAcceptablePassword(null));
+    assert.ok(!isAcceptablePassword(undefined));
+    assert.ok(!isAcceptablePassword(12345678));
+    assert.ok(!isAcceptablePassword("x".repeat(PASSWORD_MIN - 1)));
+    assert.ok(isAcceptablePassword("x".repeat(PASSWORD_MIN)));
+    assert.ok(isAcceptablePassword("x".repeat(PASSWORD_MAX)));
+    assert.ok(!isAcceptablePassword("x".repeat(PASSWORD_MAX + 1)));
   });
 });
 

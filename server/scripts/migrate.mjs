@@ -27,6 +27,7 @@ const BOOTSTRAP = [
      display_name TEXT,
      color TEXT NOT NULL UNIQUE,
      token_hash TEXT NOT NULL UNIQUE,
+     password_hash TEXT,
      is_admin INTEGER NOT NULL DEFAULT 0,
      created_at TEXT NOT NULL
    )`,
@@ -209,6 +210,22 @@ async function upgradeNotes(client, log) {
 }
 
 /**
+ * Adds `users.password_hash` to a database created before passwords existed.
+ *
+ * Nullable on purpose: SQLite cannot add a NOT NULL column without a default,
+ * and the anon-* placeholders genuinely have no credential. NULL is the
+ * accurate representation of "this account cannot sign in".
+ */
+async function ensurePasswordColumn(client, log) {
+  if (await columnExists(client, "users", "password_hash")) {
+    log("users.password_hash already present");
+    return;
+  }
+  log("adding users.password_hash");
+  await client.execute("ALTER TABLE users ADD COLUMN password_hash TEXT");
+}
+
+/**
  * The `notes` indexes can only be created once the table is in its current
  * shape, so this runs after `upgradeNotes` rather than as part of the
  * bootstrap. Against a fresh database the table is already correct.
@@ -233,6 +250,7 @@ export async function migrate({ log = () => {} } = {}) {
     log(`migrating ${url}`);
     for (const sql of BOOTSTRAP) await client.execute(sql);
     await upgradeNotes(client, log);
+    await ensurePasswordColumn(client, log);
     await ensureNoteIndexes(client);
     log("migration complete");
   } finally {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   cancelRequest,
+  changePassword,
   createNote,
   createSpace,
   deleteNote,
@@ -50,6 +51,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [rotatedToken, setRotatedToken] = useState(null);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [toast, setToast] = useState(null);
 
   const notify = useCallback((message, kind = "info") => {
@@ -361,6 +363,37 @@ export default function App() {
     }
   }, [me, session, notify]);
 
+  /**
+   * Changing the password also retires the current token, so the replacement is
+   * adopted the same way rotation does — `changePassword` writes it to storage
+   * before this runs, and if it ever stopped doing so the very next request
+   * would 401 the user straight back out to the auth gate.
+   *
+   * Returns a boolean so the sidebar can keep the form open on failure.
+   */
+  const handleChangePassword = useCallback(
+    async (currentPassword, newPassword) => {
+      setChangingPassword(true);
+      try {
+        const { token } = await changePassword(currentPassword, newPassword);
+        const current = me?.user || session?.user;
+        if (current && token) saveSession(current, token);
+        setSession((prev) => (prev && token ? { ...prev, token } : prev));
+        notify("Password changed — your old token is no longer valid");
+        return true;
+      } catch (err) {
+        notify(
+          err?.response?.data?.error || "Could not change the password",
+          "error",
+        );
+        return false;
+      } finally {
+        setChangingPassword(false);
+      }
+    },
+    [me, session, notify],
+  );
+
   /* ------------------------------- render ----------------------------- */
 
   if (!session) {
@@ -391,6 +424,8 @@ export default function App() {
         rotating={rotating}
         rotatedToken={rotatedToken}
         onDismissToken={() => setRotatedToken(null)}
+        onChangePassword={handleChangePassword}
+        changingPassword={changingPassword}
       />
 
       <main className="main">

@@ -1,46 +1,60 @@
 import { useState } from "react";
-import { register, verifyToken } from "../api";
+import { login, register } from "../api";
 import { saveSession } from "../session";
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9._-]{1,30}$/;
+// Mirrors PASSWORD_MIN on the server. The server is the authority; this only
+// exists so the button is disabled before a pointless round trip.
+const PASSWORD_MIN = 8;
 
 /**
- * Two ways in: registration mints a handle plus a chalk colour, and "sign in"
- * re-adopts an existing token. The token is the only credential the server
- * knows, so it is also the only way back into an account whose session was
- * lost — there is no password to reset.
+ * The way in: join claims a handle and a chalk colour behind a password, sign in
+ * exchanges a handle and password for a bearer token.
+ *
+ * The password is what a human remembers; the token it trades for is what
+ * actually rides on requests and what this app keeps in localStorage. The
+ * password is never stored in the browser and is sent exactly once.
  */
 export default function AuthGate({ onAuthenticated }) {
   const [mode, setMode] = useState("join");
   const [handle, setHandle] = useState("");
   const [color, setColor] = useState("#e06c75");
-  const [token, setToken] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   const cleanHandle = handle.trim().toLowerCase();
   const handleValid = HANDLE_RE.test(cleanHandle);
-  const cleanToken = token.trim();
+  const passwordOk = password.length >= PASSWORD_MIN;
 
   const switchMode = (next) => {
     setMode(next);
     setError(null);
   };
 
+  /** Reads the server's own wording; it knows better than any guess made here. */
+  const reportError = (err, fallbackField) => {
+    const payload = err?.response?.data;
+    setError({
+      message: payload?.error || fallbackMessage(err, payload),
+      field: payload?.field || fallbackField,
+    });
+  };
+
   const join = async (event) => {
     event.preventDefault();
-    if (!handleValid || busy) return;
+    if (!handleValid || !passwordOk || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await register({ handle: cleanHandle, color });
+      const result = await register({
+        handle: cleanHandle,
+        color,
+        password,
+      });
       onAuthenticated(saveSession(result.user, result.token));
     } catch (err) {
-      const payload = err?.response?.data;
-      setError({
-        message: payload?.error || "Could not create that account",
-        field: payload?.field || null,
-      });
+      reportError(err, "password");
     } finally {
       setBusy(false);
     }
@@ -48,18 +62,53 @@ export default function AuthGate({ onAuthenticated }) {
 
   const signIn = async (event) => {
     event.preventDefault();
-    if (!cleanToken || busy) return;
+    if (!handleValid || !password || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const me = await verifyToken(cleanToken);
-      onAuthenticated(saveSession(me.user, cleanToken));
-    } catch {
-      setError({ message: "That token was not accepted", field: "token" });
+      const result = await login(cleanHandle, password);
+      onAuthenticated(saveSession(result.user, result.token));
+    } catch (err) {
+      // The server deliberately does not say whether it was the handle or the
+      // password, so neither does this.
+      reportError(err, null);
     } finally {
       setBusy(false);
     }
   };
+
+  const sharedFields = (
+    <>
+      <label className="gate-label" htmlFor="handle">
+        your handle
+      </label>
+      <input
+        id="handle"
+        className={`gate-input ${error?.field === "handle" ? "invalid" : ""}`}
+        value={handle}
+        onChange={(e) => setHandle(e.target.value)}
+        placeholder="ada"
+        autoComplete="username"
+        autoFocus
+        spellCheck={false}
+      />
+      {error?.field === "handle" && <p className="gate-error">{error.message}</p>}
+
+      <label className="gate-label" htmlFor="password">
+        your password
+      </label>
+      <input
+        id="password"
+        type="password"
+        className={`gate-input ${error?.field === "password" ? "invalid" : ""}`}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        autoComplete={mode === "join" ? "new-password" : "current-password"}
+        spellCheck={false}
+      />
+      {error?.field === "password" && <p className="gate-error">{error.message}</p>}
+    </>
+  );
 
   return (
     <div className="gate">
@@ -86,20 +135,7 @@ export default function AuthGate({ onAuthenticated }) {
 
         {mode === "join" ? (
           <form onSubmit={join}>
-            <label className="gate-label" htmlFor="handle">
-              your handle
-            </label>
-            <input
-              id="handle"
-              className={`gate-input ${error?.field === "handle" ? "invalid" : ""}`}
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              placeholder="ada"
-              autoComplete="off"
-              autoFocus
-              spellCheck={false}
-            />
-            {error?.field === "handle" && <p className="gate-error">{error.message}</p>}
+            {sharedFields}
 
             <label className="gate-label" htmlFor="chalk">
               your chalk
@@ -117,41 +153,46 @@ export default function AuthGate({ onAuthenticated }) {
 
             {error && !error.field && <p className="gate-error">{error.message}</p>}
 
-            <button className="gate-submit" type="submit" disabled={!handleValid || busy}>
+            <button
+              className="gate-submit"
+              type="submit"
+              disabled={!handleValid || !passwordOk || busy}
+            >
               {busy ? "joining…" : "join the board"}
             </button>
             <p className="gate-fine">
               Your colour is claimed to your handle, so nobody else can take it.
+              {passwordOk ? "" : ` Password needs at least ${PASSWORD_MIN} characters.`}
             </p>
           </form>
         ) : (
           <form onSubmit={signIn}>
-            <label className="gate-label" htmlFor="token">
-              your token
-            </label>
-            <textarea
-              id="token"
-              className={`gate-input gate-token ${error?.field === "token" ? "invalid" : ""}`}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="paste the token you registered with"
-              rows={3}
-              autoComplete="off"
-              autoFocus
-              spellCheck={false}
-            />
-            {error && <p className="gate-error">{error.message}</p>}
+            {sharedFields}
 
-            <button className="gate-submit" type="submit" disabled={!cleanToken || busy}>
+            {error && !error.field && <p className="gate-error">{error.message}</p>}
+
+            <button
+              className="gate-submit"
+              type="submit"
+              disabled={!handleValid || !password || busy}
+            >
               {busy ? "checking…" : "sign in"}
             </button>
             <p className="gate-fine">
-              The token is the only credential. Registration shows it once and
-              the server keeps just a hash, so paste the original to get back in.
+              Your password is exchanged for a token kept in this browser only.
+              Forgot it? There is no reset — the server keeps a one-way hash and
+              nothing else can recover it.
             </p>
           </form>
         )}
       </div>
     </div>
   );
+}
+
+/** Distinguishes being rate-limited from being offline, which read very differently. */
+function fallbackMessage(err, payload) {
+  if (err?.response?.status === 429) return payload?.error || "Too many attempts. Wait a few minutes.";
+  if (!err?.response) return "Could not reach the board. Check your connection.";
+  return "Something went wrong. Try again.";
 }

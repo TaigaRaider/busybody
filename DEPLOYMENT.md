@@ -12,7 +12,7 @@
 ```
 lib/
   app.js         all routes; exports createApp()
-  auth.js        bearer-token identity (sha256 of a random 256-bit token)
+  auth.js        password hashing (scrypt) and bearer-token identity (sha256)
   db.js          single libsql client + drizzle instance
   mentions.js    @handle extraction / normalisation
   permissions.js role ranks + capability lists; every guard goes through `allow()`
@@ -99,7 +99,7 @@ legacy-data upgrade.
 
 | Table | Purpose |
 |-------|---------|
-| `users` | handle (unique, lowercase), display name, chalk colour (unique), `token_hash` (sha256), `is_admin` |
+| `users` | handle (unique, lowercase), display name, chalk colour (unique), `token_hash` (sha256), `password_hash` (scrypt, nullable), `is_admin` |
 | `spaces` | slug (unique), name, description, `owner_id`, `visibility` (`private` \| `public`) |
 | `space_members` | (space_id, user_id) PK → role, the access control list |
 | `space_requests` | pending/approved/denied/cancelled requests, one row per (space, user) |
@@ -170,9 +170,11 @@ All routes except `/ping` require `Authorization: Bearer <token>`.
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
 | GET | `/ping` | 200 | Health check (no auth) |
-| POST | `/auth/register` | 201 | `{handle, color, displayName?}` → `{user, token}`. The first account registered becomes an admin. 409 names the conflicting field. |
+| POST | `/auth/register` | 201 | `{handle, color, password, displayName?}` → `{user, token}`. Password is 8–200 characters. The first account registered becomes an admin. 409 names the conflicting field. |
+| POST | `/auth/login` | 200 | `{handle, password}` → `{user, token}`. Always a freshly issued token; the previous one stops working. Rate-limited per IP+handle. |
 | GET | `/auth/me` | 200 | `{user, memberships, pendingRequests, moderating, adminTokenConfigured}` |
 | PATCH | `/auth/me` | 200 | Change chalk colour / display name |
+| POST | `/auth/change-password` | 200 | `{currentPassword, newPassword}` → `{token}`. Reissues the token, so the caller must adopt the returned one. |
 | POST | `/auth/rotate-token` | 200 | Issue a new token; the old one stops working immediately |
 | GET | `/users?q=` | 200 | Handle autocomplete for `@mention` |
 
@@ -212,15 +214,53 @@ Every note in a response carries `size` (your layout), `author`, `mentions` and
 those flags instead of re-deriving role logic.
 
 ## Authentication Model
-- Registration mints a 256-bit random token; only its SHA-256 hash is stored in
+
+The human-facing credential is a **password**. The credential that actually rides
+on requests is a **token** the server issues in exchange for it.
+
+- **Passwords** are hashed with scrypt (N=32768, r=8, p=1, 64-byte key, 16-byte
+  salt) from `node:crypto`, stored as `scrypt$N$r$p$salt$hash`. They are *not*
+  hashed with the SHA-256 used for tokens: a token is 256 bits of CSPRNG output
+  with nothing to enumerate, whereas a password is low-entropy and a fast digest
+  would let anyone holding a stolen database test billions of guesses a second.
+- scrypt was chosen over argon2 because it is built into Node — no native
+  dependency, and nothing extra that can fail a serverless build.
+- Verification is constant-time, and `/auth/login` deliberately answers
+  identically for an unknown handle, an account with no password, and a wrong
+  password, so it cannot be used to discover which handles exist.
+- Registration, sign-in and password changes all reissue the token. Signing in
+  evicts the previous session token, so a token copied out of a shared browser
+  stops working as soon as the owner signs in themselves.
+- `password_hash` is **nullable**. The `anon-*` placeholder users created by the
+  legacy migration carry authorship for old notes but hold no credential and can
+  never authenticate; NULL is the accurate representation of that.
+- Tokens are still 256-bit random values stored as SHA-256 hashes in
   `users.token_hash`. The raw token is returned exactly once.
-- The token is the only credential. A user id is *not* a credential — this
-  replaces the old scheme where a client-chosen uuid doubled as the bearer token
-  and any note could be edited or deleted by claiming a different id.
+- A user id is *not* a credential — this replaces the old scheme where a
+  client-chosen uuid doubled as the bearer token and any note could be edited or
+  deleted by claiming a different id.
 - The client keeps the token in `localStorage` and attaches it via an axios
-  interceptor. A 401 clears it and drops back to the auth screen.
+  interceptor. A 401 clears it and drops back to the auth screen. The password is
+  never stored in the browser.
 - `ADMIN_TOKEN` remains supported as an env-based superuser. It can delete any
   note but cannot create one or hold a profile.
+- `/auth/login` is rate-limited to 10 attempts per 15 minutes per IP+handle and
+  answers 429 after that. The counter is in-memory, so on serverless it only
+  covers the warm instances serving the request — it is a brake, not a
+  guarantee. Real enforcement wants a shared counter in the database.
+
+### Password recovery
+
+There is no email, no reset token and no second factor, so a forgotten password
+is otherwise unrecoverable. For that one case:
+
+```sh
+TABLOID_NEW_PASSWORD='...' node server/scripts/set-password.mjs <handle>
+```
+
+It requires database credentials — already total control of the deployment — and
+also revokes the account's current token without printing it. The password is
+read from the environment so it does not land in shell history.
 
 ## Turso Database
 - URL: `libsql://tabloid-taigaraider.aws-us-east-2.turso.io`
@@ -278,9 +318,9 @@ code problem.
 | File | Role |
 |------|------|
 | `api.js` | axios client; attaches the bearer token, handles 401 sign-out |
-| `session.js` | token persistence |
+| `session.js` | token persistence (never the password) |
 | `App.jsx` | shell: selection, polling, pagination, mutations |
-| `components/AuthGate.jsx` | handle + chalk registration |
+| `components/AuthGate.jsx` | join (handle + chalk + password) and sign in (handle + password) |
 | `components/Sidebar.jsx` | lobby, your spaces, discover, mentions |
 | `components/Board.jsx` | composer, search, bento grid, load more |
 | `components/Composer.jsx` | note composer with `@handle` autocomplete |
@@ -302,6 +342,7 @@ all exercised end-to-end.
 |------|--------|
 | `unit.test.js` | tag extraction, colour parsing/re-tagging, role ranks and capability lists |
 | `auth.test.js` | registration, uniqueness races, token rotation, admin bootstrap |
+| `password.test.js` | scrypt round-trips, sign-in, placeholders that cannot authenticate, rate limiting, password change |
 | `notes.test.js` | CRUD, **deletion authorization**, rollback, history cap, cursor pagination, layout persistence |
 | `spaces.test.js` | the three access tiers, request/approve/deny, escalation limits, leave/delete |
 | `mentions.test.js` | tag indexing, re-indexing on edit/rollback, tag-as-invite, feed filtering by live access |

@@ -42,12 +42,36 @@ export default function Sidebar({
   rotating,
   rotatedToken,
   onDismissToken,
+  onChangePassword,
+  changingPassword,
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState("private");
   const [confirmRotate, setConfirmRotate] = useState(false);
+  const [rekeying, setRekeying] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [rekeyError, setRekeyError] = useState(null);
+
+  const closeRekey = () => {
+    setRekeying(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setRekeyError(null);
+  };
+
+  const submitRekey = async (event) => {
+    event.preventDefault();
+    if (!currentPassword || newPassword.length < 8 || changingPassword) return;
+    setRekeyError(null);
+    const ok = await onChangePassword(currentPassword, newPassword);
+    // Only clear the fields on success; on failure the user needs to retype
+    // the current password, and wiping it would make the form look broken.
+    if (ok) closeRekey();
+    else setRekeyError("Could not change the password.");
+  };
 
   const mine = spaces.filter((s) => s.role);
   const discover = spaces.filter((s) => !s.role);
@@ -192,10 +216,59 @@ export default function Sidebar({
               ⟳
             </button>
           )}
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setRekeying((open) => !open)}
+            title="Change your password"
+          >
+            🔑
+          </button>
           <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
             ⏻
           </button>
         </div>
+
+        {rekeying && (
+          <form className="rekey" onSubmit={submitRekey}>
+            <p className="rekey-title">change your password</p>
+            <input
+              className="gate-input"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="current password"
+              autoComplete="current-password"
+              autoFocus
+              spellCheck={false}
+            />
+            <input
+              className="gate-input"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="new password (8+ characters)"
+              autoComplete="new-password"
+              spellCheck={false}
+            />
+            <p className="rekey-note">
+              Your current token is retired as part of this, so keep this window
+              open — it re-signs-in with the new token automatically.
+            </p>
+            {rekeyError && <p className="gate-error">{rekeyError}</p>}
+            <div className="rekey-actions">
+              <button
+                type="submit"
+                disabled={!currentPassword || newPassword.length < 8 || changingPassword}
+              >
+                {changingPassword ? "saving…" : "save"}
+              </button>
+              <button type="button" className="ghost" onClick={closeRekey}>
+                cancel
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </aside>
   );

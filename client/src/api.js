@@ -10,8 +10,8 @@ const api = axios.create({
 // A 401 means the stored token is dead — drop it so the shell falls back to
 // the auth gate instead of looping on failed requests.
 api.interceptors.request.use((config) => {
-  // A caller-supplied Authorization header wins, so `verifyToken` can test a
-  // pasted token instead of being masked by whatever is already in storage.
+  // A caller-supplied Authorization header wins, so a request can test a
+  // credential explicitly instead of being masked by whatever is in storage.
   if (config.headers.Authorization) return config;
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -35,15 +35,25 @@ const data = (promise) => promise.then((r) => r.data);
 
 /* ------------------------------- auth ------------------------------- */
 
-export const register = data_ => data(api.post("/auth/register", data_));
+export const register = (payload) => data(api.post("/auth/register", payload));
 export const fetchMe = () => data(api.get("/auth/me"));
 /**
- * Checks a pasted token and resolves to the profile it belongs to, so a
- * returning user can get back in — registration is the only other way in.
+ * Signs in with a handle and password. The server answers with a freshly issued
+ * bearer token, which is the only thing kept in storage from here on — the
+ * password is never persisted and never leaves the sign-in form again.
  */
-export const verifyToken = (token) =>
-  data(api.get("/auth/me", { headers: { Authorization: `Bearer ${token}` } }));
+export const login = (handle, password) =>
+  data(api.post("/auth/login", { handle, password }));
 export const updateMe = (patch) => data(api.patch("/auth/me", patch));
+/**
+ * Changes the password and adopts the reissued token that comes back, since the
+ * server invalidates the old one on every successful change.
+ */
+export const changePassword = (currentPassword, newPassword) =>
+  data(api.post("/auth/change-password", { currentPassword, newPassword })).then((res) => {
+    if (res.token) localStorage.setItem(TOKEN_KEY, res.token);
+    return res;
+  });
 export const rotateToken = () => data(api.post("/auth/rotate-token"));
 export const searchUsers = (q) => data(api.get("/users", { params: { q } }));
 export const fetchColors = () => data(api.get("/colors"));

@@ -306,6 +306,69 @@
   color: var(--white);
 }
 
+/* Change-password panel, tucked under the identity row in the sidebar. */
+.rekey {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--gray-600);
+  border-radius: 6px;
+  background: var(--gray-800);
+}
+
+.rekey-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
+.rekey .gate-input {
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.rekey-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--gray-500);
+}
+
+.rekey-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rekey-actions button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--gray-500);
+  border-radius: 4px;
+  background: var(--gray-700);
+  color: var(--white);
+  cursor: pointer;
+}
+
+.rekey-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rekey-actions .ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--gray-400);
+}
+
+.rekey-actions .ghost:hover {
+  color: var(--white);
+}
+
 .me-handle {
   flex: 1;
   font-size: 12px;
