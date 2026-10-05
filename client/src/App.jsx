@@ -638,6 +638,7 @@ export default function App() {
                     onDelete={handleDelete}
                     onRollback={handleRollback}
                     onResize={handleResize}
+                    canResize={!ghosted}
                     onTag={(handle) => {
                       setSearch(`@${handle}`);
                       setView("board");

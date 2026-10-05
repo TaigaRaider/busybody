@@ -13,7 +13,21 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export default function NoteCard({ note, onEdit, onDelete, onRollback, onResize, onTag }) {
+/**
+ * `canResize` is separate from the note permissions on purpose: the bento size
+ * is a personal layout preference, so a reader who may not touch a single word
+ * still gets it. It is also the one preference the server refuses a ghost,
+ * which is why it cannot simply be inferred from `perm`.
+ */
+export default function NoteCard({
+  note,
+  onEdit,
+  onDelete,
+  onRollback,
+  onResize,
+  onTag,
+  canResize = true,
+}) {
   const runs = renderRuns(note.body, note.mentions || {});
   const perm = note.perm || {};
   const edited = note.updatedAt && note.updatedAt !== note.createdAt;
@@ -21,14 +35,16 @@ export default function NoteCard({ note, onEdit, onDelete, onRollback, onResize,
   return (
     <article className={`note-card ${note.size}`}>
       <div className="card-buttons-top-right">
-        <button
-          type="button"
-          className="resize"
-          title={`Resize (${SIZES[(SIZES.indexOf(note.size) + 1) % SIZES.length]})`}
-          onClick={() => onResize(note)}
-        >
-          ◇
-        </button>
+        {canResize && (
+          <button
+            type="button"
+            className="resize"
+            title={`Resize (${SIZES[(SIZES.indexOf(note.size) + 1) % SIZES.length]})`}
+            onClick={() => onResize(note)}
+          >
+            ◇
+          </button>
+        )}
         {perm.canEdit && (
           <button type="button" className="edit-button" title="Edit" onClick={() => onEdit(note)}>
             ∆

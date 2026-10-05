@@ -33,7 +33,10 @@ export default function Board({
   requestingJoin,
   ghosted,
 }) {
-  const canPost = space ? space.caps.includes("create_note") : true;
+  // The Lobby has no space and therefore no capability list to narrow, so the
+  // ghost check has to be here too - otherwise the one board everybody can post
+  // to is the one board a ghost can still post to.
+  const canPost = !ghosted && (space ? space.caps.includes("create_note") : true);
 
   const query = search.trim().toLowerCase();
   const visible = query
@@ -134,6 +137,7 @@ export default function Board({
             onRollback={onRollback}
             onResize={onResize}
             onTag={onTag}
+            canResize={!ghosted}
           />
         ))}
       </div>
