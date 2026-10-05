@@ -56,6 +56,7 @@ export default function Sidebar({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [rekeyError, setRekeyError] = useState(null);
+  const [discoverQuery, setDiscoverQuery] = useState("");
 
   const closeRekey = () => {
     setRekeying(false);
@@ -75,9 +76,32 @@ export default function Sidebar({
     else setRekeyError(result?.message || "Could not change the password.");
   };
 
-  const mine = spaces.filter((s) => s.role);
-  const discover = spaces.filter((s) => !s.role);
+  const needle = discoverQuery.trim().toLowerCase();
+  const matches = (s) =>
+    !needle ||
+    s.name.toLowerCase().includes(needle) ||
+    (s.description || "").toLowerCase().includes(needle);
+
+  const mineAll = spaces.filter((s) => s.role);
+  const lockedAll = spaces.filter(
+    (s) => !s.role && s.visibility === "private",
+  );
+  const discoverAll = spaces.filter(
+    (s) => !s.role && s.visibility === "public",
+  );
+
+  // The filter runs over every group. A box that greys out your own spaces while
+  // you type their name would be worse than no box at all.
+  const mine = mineAll.filter(matches);
+  const lockedVisible = lockedAll.filter(matches);
+  const discoverVisible = discoverAll.filter(matches);
   const activeId = selection.kind === "space" ? selection.id : null;
+  const searching = needle.length > 0;
+  const nothingFound =
+    searching &&
+    mine.length === 0 &&
+    lockedVisible.length === 0 &&
+    discoverVisible.length === 0;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -125,6 +149,19 @@ export default function Sidebar({
           <span className="chip subtle">open</span>
         </button>
 
+        {/* Above the lists it filters. Only worth the space once there is more
+            than one thing to find. */}
+        {(lockedAll.length + discoverAll.length + mineAll.length) > 6 && (
+          <input
+            className="discover-search"
+            type="search"
+            value={discoverQuery}
+            placeholder="find a space"
+            aria-label="Find a space"
+            onChange={(e) => setDiscoverQuery(e.target.value)}
+          />
+        )}
+
         <nav className="space-groups">
           {/* Empty groups are not rendered at all. Both headings used to show
               regardless, which spent ~122px of a phone screen on "none yet" and
@@ -145,12 +182,12 @@ export default function Sidebar({
             </div>
           )}
 
-          {discover.length > 0 && (
+          {lockedVisible.length > 0 && (
             <div className="group">
-              <h3>discover</h3>
-              <p className="group-hint">visible, but locked until you ask</p>
+              <h3>locked</h3>
+              <p className="group-hint">private — ask to get in</p>
               <ul>
-                {discover.map((s) => (
+                {lockedVisible.map((s) => (
                   <SpaceRow
                     key={s.id}
                     space={s}
@@ -160,6 +197,27 @@ export default function Sidebar({
                 ))}
               </ul>
             </div>
+          )}
+
+          {discoverVisible.length > 0 && (
+            <div className="group">
+              <h3>discover</h3>
+              <p className="group-hint">public — read without joining</p>
+              <ul>
+                {discoverVisible.map((s) => (
+                  <SpaceRow
+                    key={s.id}
+                    space={s}
+                    active={activeId === s.id}
+                    onSelect={onSelect}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {searching && nothingFound && (
+            <p className="group-empty">nothing matches “{discoverQuery.trim()}”</p>
           )}
         </nav>
 

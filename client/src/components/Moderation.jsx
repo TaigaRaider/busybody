@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  addMember,
   approveRequest,
   denyRequest,
   fetchMembers,
   fetchRequests,
   removeMember,
+  searchUsers,
   setMemberRole,
 } from "../api";
 
@@ -14,6 +16,17 @@ const ROLE_LABEL = {
   participant: "can post",
   viewer: "read only",
 };
+
+/** Roles this browser may offer. `manage_members` is owner-only server-side. */
+const GRANTABLE = [
+  { value: "viewer", label: "read only" },
+  { value: "participant", label: "can post" },
+  { value: "moderator", label: "moderator" },
+  { value: "owner", label: "co-owner" },
+];
+
+/** A partially typed @tag immediately after the caret, as in the composer. */
+const PARTIAL_TAG = /@([a-z0-9._-]*)$/i;
 
 /**
  * Moderator inbox + member roster. Both are only reachable when the server
@@ -25,9 +38,18 @@ export default function Moderation({ space, caps, onChanged, notify }) {
   const [members, setMembers] = useState([]);
   const [busyId, setBusyId] = useState(null);
 
+  const [draftHandle, setDraftHandle] = useState("");
+  const [draftRole, setDraftRole] = useState("viewer");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+
   const canManageRequests = caps.includes("manage_requests");
   const canManageMembers = caps.includes("manage_members");
   const canRead = caps.includes("read_notes");
+
+  const searchRef = useRef(null);
+  const addInputRef = useRef(null);
 
   const loadRequests = useCallback(async () => {
     if (!canManageRequests) return;
@@ -82,7 +104,9 @@ export default function Moderation({ space, caps, onChanged, notify }) {
     };
   }, [space.id, canRead, notify]);
 
-  if (!canManageRequests && !canRead) return null;
+  // The cleanup has to sit above the early return below, or a viewer without
+  // either cap would unmount before ever subscribing to it.
+  useEffect(() => () => clearTimeout(searchRef.current), []);
 
   const refresh = async () => {
     await Promise.all([loadRequests(), loadMembers()]);
@@ -101,8 +125,75 @@ export default function Moderation({ space, caps, onChanged, notify }) {
     }
   };
 
+  /* --------------------------- add by handle --------------------------- */
+
+  // Everyone already on the roster, so the picker can label them instead of
+  // letting the owner invite them to a space they are already in. Derived rather
+  // than stored, so it cannot drift from the roster it is describing.
+  const rosterHandles = new Set(members.map((m) => m.handle.toLowerCase()));
+
+  const suggest = (value, caret) => {
+    const match = value.slice(0, caret).match(PARTIAL_TAG);
+    if (!match) {
+      setSuggestions([]);
+      return;
+    }
+    clearTimeout(searchRef.current);
+    searchRef.current = setTimeout(() => {
+      searchUsers(match[1])
+        .then(setSuggestions)
+        .catch(() => setSuggestions([]));
+    }, 150);
+  };
+
+  const choose = (account) => {
+    setDraftHandle(`@${account.handle} `);
+    setSuggestions([]);
+    addInputRef.current?.focus();
+  };
+
+  const submitAdd = async (event) => {
+    event.preventDefault();
+    const handle = draftHandle.trim().replace(/^@/, "").replace(/\s+/g, "");
+    if (!handle || adding || !canManageMembers) return;
+    setAdding(true);
+    setAddError(null);
+    try {
+      const res = await addMember(space.id, { handle, role: draftRole });
+      notify(`@${res.data.handle} added as ${ROLE_LABEL[res.data.role] || res.data.role}`);
+      setDraftHandle("");
+      setDraftRole("viewer");
+      setSuggestions([]);
+      await refresh();
+    } catch (err) {
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      // 409 is not a failure to report as a dead end: they are already here, so
+      // offer the one action that actually moves things forward.
+      if (status === 409 && body?.code === "ALREADY_MEMBER") {
+        const promote = window.confirm(
+          `@${handle} is already a member (${ROLE_LABEL[body.role] || body.role}). ` +
+            `Change their role to ${ROLE_LABEL[draftRole] || draftRole}?`,
+        );
+        if (promote) {
+          await act(body.userId, () =>
+            setMemberRole(space.id, body.userId, draftRole),
+          );
+          setDraftHandle("");
+          setDraftRole("viewer");
+        }
+      } else {
+        setAddError(body?.error || "Could not add that person");
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const pending = requests.filter((r) => r.status === "pending");
   const settled = requests.filter((r) => r.status !== "pending");
+
+  if (!canManageRequests && !canRead) return null;
 
   return (
     <section className="moderation">
@@ -129,7 +220,12 @@ export default function Moderation({ space, caps, onChanged, notify }) {
 
       {tab === "requests" && canManageRequests && (
         <div className="mod-body">
-          {pending.length === 0 && <p className="empty-inline">No pending requests.</p>}
+          {pending.length === 0 ? (
+            <p className="empty-inline">
+              No pending requests. To bring somebody in without waiting, use the
+              members tab.
+            </p>
+          ) : null}
           {pending.map((r) => (
             <div key={r.id} className="request-row">
               <div className="request-who">
@@ -174,6 +270,87 @@ export default function Moderation({ space, caps, onChanged, notify }) {
 
       {tab === "roster" && canRead && (
         <div className="mod-body">
+          {canManageMembers && (
+            <form className="member-add" onSubmit={submitAdd}>
+              <p className="member-add-title">add somebody directly</p>
+              <div className="member-add-row">
+                <div className="member-add-handle">
+                  <input
+                    ref={addInputRef}
+                    type="text"
+                    value={draftHandle}
+                    placeholder="@handle"
+                    maxLength={64}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label="Handle to add"
+                    onChange={(e) => {
+                      setDraftHandle(e.target.value);
+                      setAddError(null);
+                      suggest(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!suggestions.length) return;
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setSuggestions([]);
+                      } else if (event.key === "Enter" && suggestions[0]) {
+                        // Only hijack Enter when a suggestion is showing;
+                        // otherwise it has to submit the form.
+                        event.preventDefault();
+                        choose(suggestions[0]);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setSuggestions([]), 120)}
+                  />
+                  {suggestions.length > 0 && (
+                    <ul className="mention-menu">
+                      {suggestions.map((account) => (
+                        <li key={account.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              choose(account);
+                            }}
+                          >
+                            <span
+                              className="chalk-dot"
+                              style={{ backgroundColor: account.color }}
+                            />
+                            @{account.handle}
+                            {rosterHandles.has(account.handle.toLowerCase()) && (
+                              <span className="chip subtle">already in</span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <select
+                  value={draftRole}
+                  aria-label="Role to grant"
+                  onChange={(e) => setDraftRole(e.target.value)}
+                >
+                  {GRANTABLE.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" disabled={adding || !draftHandle.trim()}>
+                  {adding ? "adding…" : "add"}
+                </button>
+              </div>
+              {addError && <p className="gate-error">{addError}</p>}
+              <p className="member-add-note">
+                Skips the request queue — useful when you already know who should
+                be in. They appear in the requests inbox as already settled.
+              </p>
+            </form>
+          )}
+
           {members.map((m) => (
             <div key={m.userId} className="member-row">
               <span className="chalk-dot" style={{ backgroundColor: m.color }} />

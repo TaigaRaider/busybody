@@ -763,6 +763,114 @@ button.ghost.danger:hover {
 }
 
 /* ------------------------------------------------------------------ *
+ * add member / space settings / discovery
+ * ------------------------------------------------------------------ */
+
+.member-add {
+  padding: 10px;
+  margin-bottom: 4px;
+  border: 1px dashed var(--gray-700);
+  background: var(--black);
+}
+
+.member-add-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.member-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Wraps the input so the suggestion menu can anchor to it. */
+.member-add-handle {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.member-add input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--gray-700);
+  background: var(--gray-900);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.member-add input:focus {
+  border-color: var(--gray-500);
+}
+
+.member-add-note {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--gray-600);
+}
+
+.space-settings {
+  margin-top: 16px;
+  border: 1px solid var(--gray-700);
+  background: var(--gray-900);
+}
+
+/* Styled like a tab, but it is a heading: same metrics, no pointer, no focus. */
+.settings-tab {
+  padding: 9px 14px;
+  border-right: 1px solid var(--gray-700);
+  color: var(--gray-500);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.settings-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0 0 4px;
+}
+
+.settings-facts dt {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.settings-facts dd {
+  margin: 2px 0 0;
+  color: var(--white);
+  font-size: 13px;
+}
+
+.settings-error {
+  padding: 0 12px 12px;
+  margin: 0;
+}
+
+.discover-search {
+  padding: 6px 8px;
+  border: 1px solid var(--gray-700);
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--sans);
+  font-size: 12px;
+  outline: none;
+}
+
+.discover-search:focus {
+  border-color: var(--gray-500);
+}
+
+/* ------------------------------------------------------------------ *
  * search + grid
  * ------------------------------------------------------------------ */
 
@@ -1466,9 +1574,51 @@ button.ghost.danger:hover {
     min-height: 44px;
   }
 
+  /* Stacking beats a squeezed row: the handle field needs the full width for
+     the suggestion menu to be readable. */
+  .member-add-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .member-add select,
+  .member-add button {
+    width: 100%;
+  }
+
+  .moderation button,
+  .space-settings button {
+    min-height: 44px;
+  }
+
   .composer-hint,
   .search-count {
     display: none;
+  }
+}
+
+/* iOS Safari magnifies the visual viewport when a text field is focused and its
+   computed font-size is below 16px, and it does not reliably restore the scale
+   when the keyboard closes — the page stays zoomed in and has to be pinched back
+   out. Every field in this app sat between 11px and 14px, so it fired on the
+   sign-in form, the note composer, search, and each inline form.
+
+   `pointer: coarse` rather than a width test alone, because iPads in portrait are
+   wider than 760px and zoom in exactly the same way.
+
+   `!important` is deliberate. The rules being overridden are class-scoped
+   (`.gate-input` at 14px, `.member-row select` at 11px) and would win on
+   specificity otherwise. The guarantee we want is "no text field on a touch
+   device is ever under 16px", and that should not be quietly breakable by a
+   later style rule — which is what an enumerated selector list would allow.
+
+   Radios are caught too, which is harmless: they hold no text, so their rendered
+   size comes from width/height, not font-size. */
+@media (pointer: coarse), (max-width: 760px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

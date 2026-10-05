@@ -21,6 +21,7 @@ import AuthGate from "./components/AuthGate";
 import Sidebar from "./components/Sidebar";
 import Board from "./components/Board";
 import Moderation from "./components/Moderation";
+import SpaceSettings from "./components/SpaceSettings";
 import AccessPanel from "./components/AccessPanel";
 import NoteCard from "./components/NoteCard";
 import TabBar from "./components/TabBar";
@@ -601,9 +602,22 @@ export default function App() {
             />
             {space && (
               <Moderation
+                key={space.id}
                 space={space}
                 caps={space.caps}
                 onChanged={refreshSpaces}
+                notify={notify}
+              />
+            )}
+            {space && (
+              <SpaceSettings
+                key={space.id}
+                space={space}
+                caps={space.caps}
+                onChanged={refreshSpaces}
+                // Deleting or leaving removes the space the shell is pointed at,
+                // so fall back to the Lobby rather than rendering an empty board.
+                onLeft={() => selectSpace({ kind: "lobby" })}
                 notify={notify}
               />
             )}

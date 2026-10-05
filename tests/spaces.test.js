@@ -334,4 +334,171 @@ describe("spaces and access requests", () => {
     assert.equal((await owner.api.del(`/spaces/${doomed}`)).status, 204);
     assert.equal((await owner.api.get(`/spaces/${doomed}`)).status, 404);
   });
+
+  /* ---------------------- adding members directly ----------------------- */
+
+  describe("adding a member by handle", () => {
+    let addSpace;
+    let invitee;
+    let handle;
+
+    before(async () => {
+      const created = await owner.api.post("/spaces", {
+        name: "Writers Room",
+        visibility: "private",
+      });
+      addSpace = created.body.id;
+      invitee = clientFor(server.base);
+      const reg = await invitee.register("invitee", "#2b6cb0");
+      assert.equal(reg.status, 201);
+      handle = reg.body.user.handle;
+    });
+
+    /**
+     * A moderator on `addSpace`, for exercising the escalation rules. The
+     * handle is suffixed per call because registration is permanent and the
+     * colour column is UNIQUE.
+     */
+    let modCount = 0;
+    const makeModerator = async () => {
+      modCount += 1;
+      const handle = `mod-person-${modCount}`;
+      const mod = clientFor(server.base);
+      // The colour is derived from the handle rather than indexed into PALETTE,
+      // which this file already walks past the end of.
+      const color = `#${(0x333333 + modCount * 0x0f0f0f).toString(16).slice(0, 6)}`;
+      const reg = await mod.register(handle, color);
+      assert.equal(reg.status, 201, `register ${handle}: ${JSON.stringify(reg.body)}`);
+      const added = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle,
+        role: "moderator",
+      });
+      assert.equal(added.status, 201);
+      assert.equal(added.body.role, "moderator");
+      return mod;
+    };
+
+    it("lets the owner add somebody by handle without a request", async () => {
+      const res = await owner.api.post(`/spaces/${addSpace}/members`, { handle });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.role, "viewer");
+      assert.equal(res.body.handle, handle);
+
+      // They can read immediately, without ever filing a request.
+      const me = await invitee.get(`/spaces/${addSpace}`);
+      assert.equal(me.body.role, "viewer");
+      assert.ok(me.body.caps.includes("read_notes"));
+      assert.ok(!me.body.caps.includes("create_note"));
+    });
+
+    it("defaults to read only and honours an explicit role", async () => {
+      const res = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle,
+        role: "participant",
+      });
+      assert.equal(res.status, 409);
+      assert.equal(res.body.code, "ALREADY_MEMBER");
+      assert.equal(res.body.role, "viewer");
+
+      // The conflict carries the userId needed to promote them via the roster.
+      const promoted = await owner.api.patch(
+        `/spaces/${addSpace}/members/${res.body.userId}`,
+        { role: "participant" },
+      );
+      assert.equal(promoted.status, 200);
+      const me = await invitee.get(`/spaces/${addSpace}`);
+      assert.ok(me.body.caps.includes("create_note"));
+    });
+
+    it("refuses an unknown handle and a malformed one", async () => {
+      const missing = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle: "nobody-here",
+      });
+      assert.equal(missing.status, 404);
+
+      const malformed = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle: "not a handle!",
+      });
+      assert.equal(malformed.status, 400);
+      assert.equal(malformed.body.code, "INVALID_HANDLE");
+    });
+
+    it("refuses an invalid role", async () => {
+      const res = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle: "someone-else",
+        role: "wizard",
+      });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.code, "INVALID_ROLE");
+    });
+
+    it("will not let the owner add themselves", async () => {
+      const res = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle: owner.user.handle,
+      });
+      assert.equal(res.status, 400);
+    });
+
+    it("stops a non-manager adding anybody", async () => {
+      const res = await invitee.post(`/spaces/${addSpace}/members`, {
+        handle: outsider.user.handle,
+      });
+      assert.equal(res.status, 403);
+    });
+
+    it("stops a moderator adding anybody, who is also no manager", async () => {
+      const mod = await makeModerator();
+      const added = await mod.post(`/spaces/${addSpace}/members`, {
+        handle: outsider.user.handle,
+        role: "viewer",
+      });
+      assert.equal(added.status, 403);
+    });
+
+    it("keeps a moderator from minting a co-owner, matching approve", async () => {
+      const mod = await makeModerator();
+
+      // A moderator holds no manage_members, so adding is already refused above.
+      // The escalation check that matters here is `grantableRole`: a moderator
+      // asking for a tier above participant is rejected as forbidden.
+      const escalate = await mod.post(`/spaces/${addSpace}/members`, {
+        handle: outsider.user.handle,
+        role: "moderator",
+      });
+      assert.equal(escalate.status, 403);
+      // FORBIDDEN, not INVALID_ROLE: the request was well-formed, the caller
+      // simply is not allowed to grant that tier.
+      assert.equal(escalate.body.code, "FORBIDDEN");
+
+      // And they did not get in by the back door.
+      const view = await outsider.api.get(`/spaces/${addSpace}`);
+      assert.equal(view.body.role, null);
+      assert.deepEqual(view.body.caps, ["discover"]);
+    });
+
+    it("closes a pending request when the person is added directly", async () => {
+      const pendingUser = clientFor(server.base);
+      const reg = await pendingUser.register("waiter", "#975a16");
+      const requested = await pendingUser.post(`/spaces/${addSpace}/requests`, {
+        role: "participant",
+      });
+      assert.equal(requested.status, 201);
+
+      const added = await owner.api.post(`/spaces/${addSpace}/members`, {
+        handle: reg.body.user.handle,
+        role: "participant",
+      });
+      assert.equal(added.status, 201);
+
+      // The request is settled, so it no longer sits in the moderator inbox.
+      const inbox = await owner.api.get(`/spaces/${addSpace}/requests`);
+      const still = inbox.body.find(
+        (r) => r.userId === reg.body.user.id && r.status === "pending",
+      );
+      assert.equal(still, undefined);
+      // And they are a participant, not still waiting.
+      const me = await pendingUser.get(`/spaces/${addSpace}`);
+      assert.equal(me.body.role, "participant");
+    });
+  });
 });

@@ -67,6 +67,13 @@ export const updateSpace = (id, patch) =>
   data(api.patch(`/spaces/${id}`, patch));
 export const deleteSpace = (id) => api.delete(`/spaces/${id}`);
 export const fetchMembers = (id) => data(api.get(`/spaces/${id}/members`));
+/**
+ * Add somebody by handle. The server answers 409 with `ALREADY_MEMBER` and the
+ * existing role when they are already on the roster, so the caller can offer to
+ * change their role instead of retyping the invite.
+ */
+export const addMember = (id, payload) =>
+  api.post(`/spaces/${id}/members`, payload);
 export const setMemberRole = (id, userId, role) =>
   data(api.patch(`/spaces/${id}/members/${userId}`, { role }));
 export const removeMember = (id, userId) =>
