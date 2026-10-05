@@ -1,0 +1,5 @@
+# `vercel env pull` writes the live database token and the admin token into
+# `.vercel-prod.env`. `.gitignore` keeps it out of commits; this keeps it out of
+# the uploaded source, which is a separate list.
+.vercel-prod.env
+local.db

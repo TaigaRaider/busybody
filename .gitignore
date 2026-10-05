@@ -3,3 +3,7 @@ node_modules/
 local.db
 .vercel
 .env*
+# `vercel env pull` writes production credentials here, and the name does not
+# match the `.env*` pattern above. Uploading it would put the live database
+# token and the admin token into a deployment bundle.
+.vercel-prod.env
