@@ -27,9 +27,36 @@ const LEGACY_SCHEMA = `
   );
 `;
 
+/**
+ * The `users` table as it stood immediately before "Ghost In Time" — present
+ * already, so `CREATE TABLE IF NOT EXISTS` leaves it alone and the migration has
+ * to reach for `ALTER TABLE`. This is the shape the live database is actually
+ * in, and the one worth testing: a fresh bootstrap never runs either
+ * `ensurePasswordColumn` or `ensureGhostColumn`.
+ */
+const PRE_GHOST_USERS = `
+  CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    handle TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    color TEXT NOT NULL UNIQUE,
+    token_hash TEXT NOT NULL UNIQUE,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+`;
+
 async function seedLegacy(dbPath) {
   const db = createClient({ url: `file:${dbPath}` });
   await db.execute(LEGACY_SCHEMA);
+  await db.execute(PRE_GHOST_USERS);
+  // One real account, so "the upgrade did not freeze anybody" is checkable
+  // against a row that existed before the column did.
+  await db.execute(
+    `INSERT INTO users (id, handle, display_name, color, token_hash, is_admin, created_at)
+     VALUES (1, 'early-bird', 'Early bird', '#8899aa', 'seed-token-hash', 0,
+             '2024-01-01T00:00:00.000Z')`,
+  );
   await db.execute(
     `INSERT INTO notes (id, title, body, created_at, updated_at, author_color, author_id, editor_color, history)
      VALUES (1, 'old one', '{% #e06c75 %}first note{% end %}', '2024-01-01T00:00:00.000Z',
@@ -169,7 +196,42 @@ describe("legacy migration", () => {
     const rows = await db.execute(`SELECT COUNT(*) AS n FROM notes`);
     assert.equal(rows.rows[0].n, 3);
     const users = await db.execute(`SELECT COUNT(*) AS n FROM users`);
-    assert.equal(users.rows[0].n, 1, "must not duplicate placeholder users");
+    assert.equal(users.rows[0].n, 2, "must not duplicate the seeded or placeholder users");
+  });
+
+  /* ------------------------------ ghost in time ------------------------------ */
+
+  it("adds ghosted_at to a users table that predates it", async () => {
+    // The seed deliberately has no ghosted_at, so this asserts the ALTER ran
+    // rather than the no-op branch a freshly bootstrapped database takes.
+    const cols = await columns("users");
+    assert.ok(cols.includes("ghosted_at"), "ghosted_at should have been added");
+    assert.ok(cols.includes("password_hash"), "password_hash should have been added");
+  });
+
+  it("leaves every pre-existing account live, not frozen", async () => {
+    // The dangerous failure mode of this migration: a NOT NULL column with a
+    // default would silently freeze the whole site on deploy. Nullable and
+    // unlisted means every existing row is NULL, which is the live state.
+    const rows = await db.execute(`SELECT handle, ghosted_at FROM users ORDER BY id`);
+    assert.equal(rows.rows.length, 2);
+    for (const row of rows.rows) {
+      assert.equal(
+        row.ghosted_at,
+        null,
+        `${row.handle} should not have been ghosted by an upgrade`,
+      );
+    }
+  });
+
+  it("still signs the pre-existing account in after the upgrade", async () => {
+    const reader = clientFor(`http://127.0.0.1:${server.address().port}`);
+    const res = await reader.login("early-bird", "irrelevant-because-none-was-set");
+    // No credential was seeded, so this must fail cleanly rather than 500 on
+    // the NULL password_hash the ALTER introduced. The handle is real, so this
+    // is a wrong-password answer, not an unknown-account one.
+    assert.equal(res.status, 401);
+    assert.equal(res.body.code, "BAD_CREDENTIALS");
   });
 
   it("serves the migrated notes over the API", async () => {

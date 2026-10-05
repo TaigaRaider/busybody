@@ -24,6 +24,87 @@
   border-bottom: 1px solid var(--gray-700);
 }
 
+/* ------------------------------------------------------------------ *
+ * ghost in time
+ * ------------------------------------------------------------------ */
+
+/* Deliberately not the danger palette. Ghosting is a choice the holder made
+   about their own account, not a fault or a lockout, so it reads as chalk dust
+   - faded and quiet - and the only saturated thing on it is the way back. */
+.ghost-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--gray-600);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--gray-900),
+    var(--gray-900) 6px,
+    var(--black) 6px,
+    var(--black) 12px
+  );
+  color: var(--gray-400);
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  line-height: 1.6;
+}
+
+.ghost-banner strong {
+  color: var(--gray-300);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.ghost-banner button {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+/* The drawer's copy of the same fact. The banner is the primary one; this is
+   here so the state is still visible with the drawer closed on a phone. */
+.ghost-state {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  border: 1px dashed var(--gray-600);
+  background: var(--gray-900);
+}
+
+.ghost-state p {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gray-300);
+  line-height: 1.5;
+}
+
+.ghost-since {
+  display: block;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gray-500);
+}
+
+.ghost-state button {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.ghost-state button:disabled,
+.ghost-banner button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .main-title h1 {
   margin: 0;
   font-size: 22px;
@@ -1606,6 +1687,14 @@ button.ghost.danger:hover {
   .moderation button,
   .space-settings button {
     min-height: 44px;
+  }
+
+  /* Reviving is the one control a ghost must be able to hit without hunting,
+     so it gets the same treatment as everything else in the drawer. */
+  .ghost-state button,
+  .ghost-banner button {
+    min-height: 44px;
+    width: 100%;
   }
 
   .composer-hint,

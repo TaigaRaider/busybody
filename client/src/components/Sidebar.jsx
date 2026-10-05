@@ -48,6 +48,9 @@ export default function Sidebar({
   onDismissToken,
   onChangePassword,
   changingPassword,
+  onGhost,
+  onRevive,
+  ghosting,
   drawerOpen,
   onCloseDrawer,
 }) {
@@ -56,6 +59,7 @@ export default function Sidebar({
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState("private");
   const [confirmRotate, setConfirmRotate] = useState(false);
+  const [confirmGhost, setConfirmGhost] = useState(false);
   const [rekeying, setRekeying] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -79,6 +83,10 @@ export default function Sidebar({
     if (result?.ok) closeRekey();
     else setRekeyError(result?.message || "Could not change the password.");
   };
+
+  // The one flag the whole feature turns on. The server is the authority - this
+  // only decides which buttons are drawn.
+  const ghosted = Boolean(user.ghostedAt);
 
   const needle = discoverQuery.trim().toLowerCase();
   const matches = (s) =>
@@ -226,39 +234,58 @@ export default function Sidebar({
           )}
         </nav>
 
-        {creating ? (
-          <form className="space-create" onSubmit={submit}>
-            <input
-              autoFocus
-              placeholder="space name"
-              value={name}
-              maxLength={80}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              placeholder="what is it for? (optional)"
-              value={description}
-              maxLength={300}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-              <option value="private">private — request to read or post</option>
-              <option value="public">public — anyone can read</option>
-            </select>
-            <div className="row">
-              <button type="submit">create</button>
-              <button type="button" className="ghost" onClick={() => setCreating(false)}>
-                cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button type="button" className="space-new" onClick={() => setCreating(true)}>
-            + new space
-          </button>
-        )}
+        {/* Creating a room is management, so a ghost does not get the button at
+            all rather than getting one that 403s. */}
+        {!ghosted &&
+          (creating ? (
+            <form className="space-create" onSubmit={submit}>
+              <input
+                autoFocus
+                placeholder="space name"
+                value={name}
+                maxLength={80}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <input
+                placeholder="what is it for? (optional)"
+                value={description}
+                maxLength={300}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+                <option value="private">private — request to read or post</option>
+                <option value="public">public — anyone can read</option>
+              </select>
+              <div className="row">
+                <button type="submit">create</button>
+                <button type="button" className="ghost" onClick={() => setCreating(false)}>
+                  cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button type="button" className="space-new" onClick={() => setCreating(true)}>
+              + new space
+            </button>
+          ))}
 
         <div className="sidebar-foot">
+          {/* Persistent, not a toast: a ghost must never be able to forget why
+              the board has gone quiet, and this is also where the way back is. */}
+          {ghosted && (
+            <div className="ghost-state">
+              <p>
+                you are a ghost
+                <span className="ghost-since">
+                  {" "}
+                  since {new Date(user.ghostedAt).toLocaleString()}
+                </span>
+              </p>
+              <button type="button" onClick={onRevive} disabled={ghosting}>
+                {ghosting ? "waking…" : "revive"}
+              </button>
+            </div>
+          )}
           {rotatedToken && (
             <div className="token-reveal">
               <p>your new token — copy it now, it is shown only once:</p>
@@ -310,6 +337,38 @@ export default function Sidebar({
             >
               🔑
             </button>
+            {/* Ghosting looks like signing out, so it takes a deliberate second
+                click rather than being one stray tap away. Reviving, by
+                contrast, is one click in the banner above - it has to be easy,
+                since the person most likely to want it is the one who has
+                walked away. */}
+            {!ghosted &&
+              (confirmGhost ? (
+                <span className="rotate-confirm">
+                  <button
+                    type="button"
+                    disabled={ghosting}
+                    onClick={() => {
+                      setConfirmGhost(false);
+                      onGhost();
+                    }}
+                  >
+                    {ghosting ? "…" : "go"}
+                  </button>
+                  <button type="button" className="ghost" onClick={() => setConfirmGhost(false)}>
+                    no
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setConfirmGhost(true)}
+                  title="Pause your account — nothing is deleted, and you can come back"
+                >
+                  👻
+                </button>
+              ))}
             <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
               ⏻
             </button>

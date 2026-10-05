@@ -4,7 +4,14 @@ import { useState } from "react";
  * Shown when the signed-in user cannot read a space. "private" here means the
  * notes are gated — the space is still listed so people can ask for access.
  */
-export default function AccessPanel({ space, pendingRequest, busy, onRequest, onWithdraw }) {
+export default function AccessPanel({
+  space,
+  pendingRequest,
+  busy,
+  onRequest,
+  onWithdraw,
+  ghosted,
+}) {
   const [role, setRole] = useState("participant");
   const [message, setMessage] = useState("");
 
@@ -19,7 +26,22 @@ export default function AccessPanel({ space, pendingRequest, busy, onRequest, on
       <h2>{space.name}</h2>
       {space.description && <p className="access-desc">{space.description}</p>}
 
-      {pendingRequest ? (
+      {/* A ghost cannot ask for anything, but they may still withdraw a request
+          they made before ghosting - so that branch stays reachable and only
+          the way to *start* one closes. */}
+      {ghosted ? (
+        <div className="access-pending">
+          <p>
+            You are a ghost. This space opens up again when you revive; nothing
+            you asked for is lost in the meantime.
+          </p>
+          {pendingRequest && (
+            <button type="button" className="ghost" onClick={onWithdraw} disabled={busy}>
+              withdraw request
+            </button>
+          )}
+        </div>
+      ) : pendingRequest ? (
         <div className="access-pending">
           <p>
             Your request for <strong>{pendingRequest}</strong> access is waiting

@@ -9,9 +9,11 @@ import {
   fetchMentions,
   fetchNotes,
   fetchSpaces,
+  ghostAccount,
   requestAccess,
   rollbackNote,
   rotateToken,
+  reviveAccount,
   setNoteSize,
   updateNote,
 } from "./api";
@@ -56,6 +58,7 @@ export default function App() {
   const [rotating, setRotating] = useState(false);
   const [rotatedToken, setRotatedToken] = useState(null);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [ghosting, setGhosting] = useState(false);
   const [toast, setToast] = useState(null);
 
   /* --------------------------- mobile chrome -------------------------- */
@@ -153,7 +156,11 @@ export default function App() {
   const canRead = space ? space.caps.includes("read_notes") : true;
   // Mirrors Board's own check so the bottom bar can omit Post for a reader
   // rather than offering a button that only reveals a "you cannot post here".
-  const canPost = space ? space.caps.includes("create_note") : true;
+  // The server already drops `create_note` from a ghost's caps, so this line is
+  // belt-and-braces for the Lobby, where there is no space to carry caps.
+  const canPost =
+    (space ? space.caps.includes("create_note") : true) &&
+    !(me?.user || session?.user)?.ghostedAt;
 
   const selectSpace = (target) => {
     setView("board");
@@ -444,6 +451,66 @@ export default function App() {
     [me, session, notify],
   );
 
+  /* --------------------------- ghost in time --------------------------- */
+
+  /**
+   * Both directions of "Ghost In Time" go through here, because they have the
+   * same three consequences: adopt the new user shape, drop whatever transient
+   * editing state is open, and re-read the board under the new rules.
+   *
+   * Refetching rather than patching local state is the point. On ghosting the
+   * server starts hiding everything written since the timestamp, and on revive
+   * it stops - so the notes, spaces and capabilities already in memory are
+   * stale in both directions and only a fresh read knows the difference.
+   */
+  const setGhosted = useCallback(
+    async (call, { verb, done }) => {
+      setGhosting(true);
+      try {
+        const { user } = await call();
+        const next = { ...(me?.user || session?.user), ...user };
+        if (session) saveSession(next, session.token);
+        setMe((prev) => ({ ...prev, user: next }));
+        setSession((prev) => (prev ? { ...prev, user: next } : prev));
+        // Any half-finished edit predates the ghosting and must not be
+        // submittable afterwards.
+        setEditing(null);
+        setComposerOpen(false);
+        setFeed(emptyFeed);
+        // `refreshSpaces` bumps this, which is the notes effect's signal to
+        // re-read. Bumping it explicitly covers the case it does not: ghosting
+        // from the Lobby leaves `spaceId` unchanged, so without this the board
+        // would keep showing the notes the server has just stopped serving.
+        await refreshSpaces();
+        setAccessVersion((v) => v + 1);
+        notify(done(), "info");
+      } catch (err) {
+        notify(err?.response?.data?.error || `Could not ${verb}`, "error");
+      } finally {
+        setGhosting(false);
+      }
+    },
+    [me, session, notify, refreshSpaces],
+  );
+
+  const handleGhost = useCallback(
+    () =>
+      setGhosted(ghostAccount, {
+        verb: "become a ghost",
+        done: () => "You are a ghost. Nothing was deleted - revive whenever you like.",
+      }),
+    [setGhosted],
+  );
+
+  const handleRevive = useCallback(
+    () =>
+      setGhosted(reviveAccount, {
+        verb: "revive",
+        done: () => "Welcome back. Everything written since you left is here again.",
+      }),
+    [setGhosted],
+  );
+
   /* ------------------------------- render ----------------------------- */
 
   if (!session) {
@@ -458,6 +525,11 @@ export default function App() {
   }
 
   const user = me?.user || session.user;
+
+  // Everything below reads this rather than checking the flag again. The server
+  // refuses each write independently; this only keeps the UI from offering a
+  // button whose only possible outcome is an error.
+  const ghosted = Boolean(user.ghostedAt);
 
   // Every route into mentions and the composer has to leave the drawer closed,
   // because on a phone those are both things the drawer was covering.
@@ -491,11 +563,27 @@ export default function App() {
         onDismissToken={() => setRotatedToken(null)}
         onChangePassword={handleChangePassword}
         changingPassword={changingPassword}
+        onGhost={handleGhost}
+        onRevive={handleRevive}
+        ghosting={ghosting}
         drawerOpen={drawerVisible}
         onCloseDrawer={() => setDrawerOpen(false)}
       />
 
       <main className="main">
+        {ghosted && (
+          <div className="ghost-banner" role="status">
+            <div>
+              <strong>You are a ghost.</strong> You can read everything you could
+              read when you left, and nothing written since. Posting, spaces and
+              requests are closed.
+            </div>
+            <button type="button" onClick={handleRevive} disabled={ghosting}>
+              {ghosting ? "waking…" : "revive"}
+            </button>
+          </div>
+        )}
+
         <header className="main-head">
           <div className="main-title">
             <h1>{view === "mentions" ? "Your mentions" : space ? space.name : "Lobby"}</h1>
@@ -573,6 +661,7 @@ export default function App() {
             busy={busy}
             onRequest={handleRequestAccess}
             onWithdraw={handleWithdrawRequest}
+            ghosted={ghosted}
           />
         ) : (
           <>
@@ -610,6 +699,7 @@ export default function App() {
                   : null
               }
               requestingJoin={busy}
+              ghosted={ghosted}
             />
             {space && (
               <Moderation

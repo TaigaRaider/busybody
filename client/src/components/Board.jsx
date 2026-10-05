@@ -31,6 +31,7 @@ export default function Board({
   onRequestJoin,
   onWithdrawJoin,
   requestingJoin,
+  ghosted,
 }) {
   const canPost = space ? space.caps.includes("create_note") : true;
 
@@ -61,29 +62,44 @@ export default function Board({
         /* A public space grants read to non-members, so this panel is the only
            route from browsing to posting — `AccessPanel` never renders for a
            space you can already read. Without the button the notice below it
-           was advice with no way to act on it. */
+           was advice with no way to act on it.
+
+           A ghost gets the same panel with different words: the caps are
+           narrowed server-side so the composer closed on its own, but "request
+           to participate" would be advice they cannot take and the server would
+           refuse. */
         <div className="board-readonly">
-          <p>
-            {onWithdrawJoin
-              ? `Your request for ${space.pendingRequest} access is waiting for a moderator.`
-              : "You have read access to this space. Request to participate to post."}
-          </p>
-          {onRequestJoin && (
-            <button
-              type="button"
-              className="ghost"
-              disabled={requestingJoin}
-              onClick={onRequestJoin}
-            >
-              {requestingJoin ? "requesting…" : "request to participate"}
-            </button>
-          )}
-          {/* Withdrawing from here for the same reason: the request was made from
-              here, and AccessPanel is not on screen to undo it. */}
-          {onWithdrawJoin && (
-            <button type="button" className="ghost" onClick={onWithdrawJoin}>
-              withdraw request
-            </button>
+          {ghosted ? (
+            <p>
+              You are reading this as a ghost. You can see everything here as it
+              was when you left, but posting and access requests are closed until
+              you revive.
+            </p>
+          ) : (
+            <>
+              <p>
+                {onWithdrawJoin
+                  ? `Your request for ${space.pendingRequest} access is waiting for a moderator.`
+                  : "You have read access to this space. Request to participate to post."}
+              </p>
+              {onRequestJoin && (
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={requestingJoin}
+                  onClick={onRequestJoin}
+                >
+                  {requestingJoin ? "requesting…" : "request to participate"}
+                </button>
+              )}
+              {/* Withdrawing from here for the same reason: the request was made from
+                  here, and AccessPanel is not on screen to undo it. */}
+              {onWithdrawJoin && (
+                <button type="button" className="ghost" onClick={onWithdrawJoin}>
+                  withdraw request
+                </button>
+              )}
+            </>
           )}
         </div>
       )}

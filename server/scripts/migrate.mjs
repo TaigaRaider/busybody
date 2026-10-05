@@ -12,6 +12,7 @@
  *   - notes drops the unused editor_color column
  *   - new: users, spaces, space_members, space_requests, note_mentions,
  *          note_layouts
+ *   - users gains ghosted_at    -> NULL means a live account
  *
  * Legacy notes keep an "archived author" placeholder user keyed off the old
  * uuid prefix. Because those users have no known credential, only an admin can
@@ -29,6 +30,7 @@ const BOOTSTRAP = [
      token_hash TEXT NOT NULL UNIQUE,
      password_hash TEXT,
      is_admin INTEGER NOT NULL DEFAULT 0,
+     ghosted_at TEXT,
      created_at TEXT NOT NULL
    )`,
 
@@ -226,6 +228,21 @@ async function ensurePasswordColumn(client, log) {
 }
 
 /**
+ * Adds `users.ghosted_at` for databases created before "Ghost In Time".
+ *
+ * Nullable with no default: an existing row has NULL, which is the live state,
+ * so no backfill is needed and no account is accidentally frozen by an upgrade.
+ */
+async function ensureGhostColumn(client, log) {
+  if (await columnExists(client, "users", "ghosted_at")) {
+    log("users.ghosted_at already present");
+    return;
+  }
+  log("adding users.ghosted_at");
+  await client.execute("ALTER TABLE users ADD COLUMN ghosted_at TEXT");
+}
+
+/**
  * The `notes` indexes can only be created once the table is in its current
  * shape, so this runs after `upgradeNotes` rather than as part of the
  * bootstrap. Against a fresh database the table is already correct.
@@ -251,6 +268,7 @@ export async function migrate({ log = () => {} } = {}) {
     for (const sql of BOOTSTRAP) await client.execute(sql);
     await upgradeNotes(client, log);
     await ensurePasswordColumn(client, log);
+    await ensureGhostColumn(client, log);
     await ensureNoteIndexes(client);
     log("migration complete");
   } finally {

@@ -55,6 +55,16 @@ export const changePassword = (currentPassword, newPassword) =>
     return res;
   });
 export const rotateToken = () => data(api.post("/auth/rotate-token"));
+
+/**
+ * "Ghost In Time": pause your own account without deleting it. Nothing is
+ * revoked and nothing is lost - the server just stamps `ghostedAt` and starts
+ * hiding everything written after that moment, and refuses every write.
+ */
+export const ghostAccount = () => data(api.post("/auth/ghost"));
+
+/** Undoes `ghostAccount`. No cooldown, no password: the holder owns it. */
+export const reviveAccount = () => data(api.post("/auth/revive"));
 export const searchUsers = (q) => data(api.get("/users", { params: { q } }));
 export const fetchColors = () => data(api.get("/colors"));
 

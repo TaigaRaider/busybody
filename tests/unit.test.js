@@ -21,7 +21,7 @@ import {
   renderRuns,
   stripMarkup,
 } from "../lib/richtext.js";
-import { allow, capsFor, grantableRole, rank } from "../lib/permissions.js";
+import { allow, capsFor, grantableRole, isGhosted, rank } from "../lib/permissions.js";
 
 const privateSpace = { id: 1, visibility: "private" };
 const publicSpace = { id: 2, visibility: "public" };
@@ -267,5 +267,57 @@ describe("permissions", () => {
 
     // Admins are not bound by space roles.
     assert.equal(grantableRole({ id: 3, isAdmin: 1 }, privateSpace, null, "owner"), "owner");
+  });
+
+  it("stops a ghost writing, whatever their role", () => {
+    const ghostOwner = { id: 1, isAdmin: 0, ghostedAt: "2026-01-01T00:00:00.000Z" };
+
+    // Reading survives, at every rank.
+    assert.ok(allow(ghostOwner, privateSpace, "owner", "read_notes"));
+    assert.ok(allow(ghostOwner, null, null, "read_notes"));
+
+    // Every write does not.
+    for (const action of [
+      "create_note",
+      "edit_own",
+      "delete_own",
+      "edit_any",
+      "delete_any",
+      "manage_requests",
+      "manage_members",
+      "delete_space",
+    ]) {
+      assert.equal(
+        allow(ghostOwner, privateSpace, "owner", action),
+        false,
+        `${action} should be refused to a ghost`,
+      );
+    }
+
+    // Including a non-member discovering a private space by name.
+    assert.ok(allow(ghostOwner, privateSpace, null, "discover"));
+  });
+
+  it("refuses a ghost's own escalation even when they moderate", () => {
+    const ghostMod = { id: 2, isAdmin: 0, ghostedAt: "2026-01-01T00:00:00.000Z" };
+    assert.equal(grantableRole(ghostMod, privateSpace, "moderator", "viewer"), null);
+  });
+
+  it("does not let the admin flag outlive a ghosting", () => {
+    // A ghost is read-only in full. Otherwise an admin could not step away,
+    // and "read only" would quietly mean "read only except for the powerful".
+    const ghostAdmin = { id: 3, isAdmin: 1, ghostedAt: "2026-01-01T00:00:00.000Z" };
+    // Reading the Lobby still works...
+    assert.ok(allow(ghostAdmin, null, null, "read_notes"));
+    // ...but the admin flag no longer opens anything the role did not.
+    assert.equal(allow(ghostAdmin, null, null, "delete_any"), false);
+    assert.equal(allow(ghostAdmin, null, null, "manage_members"), false);
+    assert.equal(allow(ghostAdmin, privateSpace, null, "read_notes"), false);
+  });
+
+  it("reports a live account as unghosted", () => {
+    assert.equal(isGhosted({ id: 1, ghostedAt: null }), false);
+    assert.equal(isGhosted({ id: 1 }), false);
+    assert.equal(isGhosted({ id: 1, ghostedAt: "2026-01-01T00:00:00.000Z" }), true);
   });
 });
