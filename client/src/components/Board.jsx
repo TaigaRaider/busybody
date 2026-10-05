@@ -28,6 +28,9 @@ export default function Board({
   composerCollapsed,
   onExpandComposer,
   onCollapseComposer,
+  onRequestJoin,
+  onWithdrawJoin,
+  requestingJoin,
 }) {
   const canPost = space ? space.caps.includes("create_note") : true;
 
@@ -55,9 +58,34 @@ export default function Board({
           onCollapse={onCollapseComposer}
         />
       ) : (
-        <p className="board-readonly">
-          You have read access to this space. Request to participate to post.
-        </p>
+        /* A public space grants read to non-members, so this panel is the only
+           route from browsing to posting — `AccessPanel` never renders for a
+           space you can already read. Without the button the notice below it
+           was advice with no way to act on it. */
+        <div className="board-readonly">
+          <p>
+            {onWithdrawJoin
+              ? `Your request for ${space.pendingRequest} access is waiting for a moderator.`
+              : "You have read access to this space. Request to participate to post."}
+          </p>
+          {onRequestJoin && (
+            <button
+              type="button"
+              className="ghost"
+              disabled={requestingJoin}
+              onClick={onRequestJoin}
+            >
+              {requestingJoin ? "requesting…" : "request to participate"}
+            </button>
+          )}
+          {/* Withdrawing from here for the same reason: the request was made from
+              here, and AccessPanel is not on screen to undo it. */}
+          {onWithdrawJoin && (
+            <button type="button" className="ghost" onClick={onWithdrawJoin}>
+              withdraw request
+            </button>
+          )}
+        </div>
       )}
 
       <div className="search-bar">

@@ -21,6 +21,10 @@ function SpaceRow({ space, active, onSelect }) {
           <span className={`chip subtle ${space.role}`}>{ROLE_HINT[space.role]}</span>
         ) : space.pendingRequest ? (
           <span className="chip subtle pending">asked</span>
+        ) : space.visibility === "public" ? (
+          // Public and not a member is readable, not locked. Saying otherwise
+          // contradicted the "read without joining" hint right above it.
+          <span className="chip subtle">open</span>
         ) : (
           <span className="chip subtle">locked</span>
         )}
@@ -149,9 +153,10 @@ export default function Sidebar({
           <span className="chip subtle">open</span>
         </button>
 
-        {/* Above the lists it filters. Only worth the space once there is more
-            than one thing to find. */}
-        {(lockedAll.length + discoverAll.length + mineAll.length) > 6 && (
+        {/* Above the lists it filters, and only once the lists are long enough
+            to need it. Five is roughly where the drawer starts scrolling on a
+            phone; below that the box is a control with nothing to control. */}
+        {mineAll.length + lockedAll.length + discoverAll.length > 4 && (
           <input
             className="discover-search"
             type="search"

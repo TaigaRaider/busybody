@@ -599,6 +599,17 @@ export default function App() {
               composerCollapsed={isMobile && !composerOpen}
               onExpandComposer={openComposer}
               onCollapseComposer={() => setComposerOpen(false)}
+              onRequestJoin={
+                space && !space.role && !space.pendingRequest
+                  ? () => handleRequestAccess("participant", null)
+                  : null
+              }
+              onWithdrawJoin={
+                space && !space.role && space.pendingRequest
+                  ? handleWithdrawRequest
+                  : null
+              }
+              requestingJoin={busy}
             />
             {space && (
               <Moderation

@@ -1052,6 +1052,15 @@ button.ghost.danger:hover {
   font-size: 12px;
 }
 
+/* Holds the sentence and its button without inheriting the padding twice. */
+.board-readonly p {
+  margin: 0;
+}
+
+.board-readonly button {
+  margin: 8px 8px 0 0;
+}
+
 /* ------------------------------------------------------------------ *
  * load more
  * ------------------------------------------------------------------ */
@@ -1584,6 +1593,14 @@ button.ghost.danger:hover {
   .member-add select,
   .member-add button {
     width: 100%;
+  }
+
+  /* 21px and 34px are the natural heights of a select and a 16px input. Both
+     are still below the 44px a thumb needs. */
+  .member-add input,
+  .member-add select,
+  .discover-search {
+    min-height: 44px;
   }
 
   .moderation button,
