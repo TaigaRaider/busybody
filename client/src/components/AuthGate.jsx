@@ -15,7 +15,13 @@ const PASSWORD_MIN = 8;
  * actually rides on requests and what this app keeps in localStorage. The
  * password is never stored in the browser and is sent exactly once.
  */
-export default function AuthGate({ onAuthenticated }) {
+/**
+ * `children` renders after the card, which is where App puts its toast. Signing
+ * out is not the only way to land here — deleting an account does it — so the
+ * confirmation of the thing that just happened has to be able to survive the
+ * gate appearing.
+ */
+export default function AuthGate({ onAuthenticated, children }) {
   const [mode, setMode] = useState("join");
   const [handle, setHandle] = useState("");
   const [color, setColor] = useState("#e06c75");
@@ -186,6 +192,7 @@ export default function AuthGate({ onAuthenticated }) {
           </form>
         )}
       </div>
+      {children}
     </div>
   );
 }

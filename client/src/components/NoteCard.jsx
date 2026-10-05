@@ -86,7 +86,17 @@ export default function NoteCard({
         </div>
         <p className="note-timestamp">
           <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
-          {note.author ? `@${note.author.handle}` : "archived"}
+          {/* Three bylines, told apart by `gone`: a live account, a departed one
+              (the server sends the snapshot handle with `gone: true`), or a note
+              that never had an author at all. Collapsing the middle case into
+              "archived" would claim it was anonymous, which it was not. */}
+          {note.author ? (
+            <span className={note.author.gone ? "author-gone" : undefined}>
+              @{note.author.handle}
+            </span>
+          ) : (
+            "archived"
+          )}
           {" · "}
           {timeAgo(note.createdAt)}
           {edited ? ` · edited ${timeAgo(note.updatedAt)}` : ""}

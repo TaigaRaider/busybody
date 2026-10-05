@@ -82,7 +82,9 @@ export function clientFor(base, token = null) {
     post: (path, body) => call("POST", path, body),
     put: (path, body) => call("PUT", path, body),
     patch: (path, body) => call("PATCH", path, body),
-    del: (path) => call("DELETE", path),
+    // A DELETE may carry a body — deleting an account has to prove the
+    // password — so this takes one rather than hard-coding the empty case.
+    del: (path, body) => call("DELETE", path, body),
     /**
      * Registers and keeps the returned token for later calls.
      *

@@ -4,6 +4,7 @@ import {
   changePassword,
   createNote,
   createSpace,
+  deleteAccount,
   deleteNote,
   fetchMe,
   fetchMentions,
@@ -59,6 +60,7 @@ export default function App() {
   const [rotatedToken, setRotatedToken] = useState(null);
   const [changingPassword, setChangingPassword] = useState(false);
   const [ghosting, setGhosting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
 
   /* --------------------------- mobile chrome -------------------------- */
@@ -511,6 +513,43 @@ export default function App() {
     [setGhosted],
   );
 
+  /* --------------------------- account deletion ------------------------- */
+
+  /**
+   * Deletes the account, then signs out.
+   *
+   * `signOut()` rather than a bare `setSession(null)` because a deleted account
+   * leaves real state behind that the auth gate would otherwise still be showing
+   * on top of: the last-selected space, the open composer, the rotated token
+   * sitting in the panel. Clearing all of it is what makes signing back in land
+   * on a clean board rather than somebody else's leftover space.
+   *
+   * Returns `{ ok, message }` like `handleChangePassword`, so the sidebar keeps
+   * the password in the box on a refusal - an OWNS_SPACES answer is an
+   * instruction to go and deal with the spaces first, and wiping the field would
+   * make that feel like a dead end.
+   */
+  const handleDeleteAccount = useCallback(
+    async (password) => {
+      setDeleting(true);
+      // Read the handle before signing out, which clears it.
+      const handle = (me?.user || session?.user)?.handle;
+      try {
+        await deleteAccount(password);
+        signOut();
+        notify(handle ? `@${handle} is gone` : "Your account is gone");
+        return { ok: true };
+      } catch (err) {
+        const message = err?.response?.data?.error || "Could not delete the account";
+        notify(message, "error");
+        return { ok: false, message };
+      } finally {
+        setDeleting(false);
+      }
+    },
+    [me, session, notify],
+  );
+
   /* ------------------------------- render ----------------------------- */
 
   if (!session) {
@@ -520,7 +559,14 @@ export default function App() {
           setSession(next);
           updateStoredUser(next.user);
         }}
-      />
+      >
+        {/* The toast lives outside the signed-in shell on purpose. Deleting an
+            account signs you straight out, and "your account is gone" is exactly
+            the confirmation that must survive landing on the auth gate — without
+            it the board would just blink from a full sidebar to a login form
+            with no explanation. */}
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </AuthGate>
     );
   }
 
@@ -566,6 +612,8 @@ export default function App() {
         onGhost={handleGhost}
         onRevive={handleRevive}
         ghosting={ghosting}
+        onDeleteAccount={handleDeleteAccount}
+        deleting={deleting}
         drawerOpen={drawerVisible}
         onCloseDrawer={() => setDrawerOpen(false)}
       />
@@ -694,6 +742,7 @@ export default function App() {
                   ? () => handleRequestAccess("participant", null)
                   : null
               }
+              user={user}
               onWithdrawJoin={
                 space && !space.role && space.pendingRequest
                   ? handleWithdrawRequest

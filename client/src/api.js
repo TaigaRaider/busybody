@@ -65,6 +65,19 @@ export const ghostAccount = () => data(api.post("/auth/ghost"));
 
 /** Undoes `ghostAccount`. No cooldown, no password: the holder owns it. */
 export const reviveAccount = () => data(api.post("/auth/revive"));
+
+/**
+ * Deletes the signed-in account for good. The password has to be retyped,
+ * because `requireAuth` only proves a token and a token is sitting in local
+ * storage on whatever machine last used the board.
+ *
+ * Returns the raw axios response rather than unwrapped data: this one succeeds
+ * with 204 and no body, so there is nothing to unwrap and a truthy value would
+ * be a lie. Errors are left to reject so the caller can read `response.data` for
+ * `OWNS_SPACES` / `LAST_ADMIN` and say something useful about them.
+ */
+export const deleteAccount = (password) => api.delete("/auth/me", { data: { password } });
+
 export const searchUsers = (q) => data(api.get("/users", { params: { q } }));
 export const fetchColors = () => data(api.get("/colors"));
 

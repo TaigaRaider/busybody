@@ -32,6 +32,7 @@ export default function Board({
   onWithdrawJoin,
   requestingJoin,
   ghosted,
+  user,
 }) {
   // The Lobby has no space and therefore no capability list to narrow, so the
   // ghost check has to be here too - otherwise the one board everybody can post
@@ -39,7 +40,21 @@ export default function Board({
   const canPost = !ghosted && (space ? space.caps.includes("create_note") : true);
 
   const query = search.trim().toLowerCase();
-  const visible = query
+
+  /**
+   * `whoami?` in the search box answers with your own name instead of filtering.
+   *
+   * Exact match on the trimmed, lowercased query, with the question mark
+   * optional — punctuation that carries no intent should not decide whether a
+   * question gets answered, but anything looser would hijack a genuine search
+   * for the word. Checked before the filter so it never reads as "0 of 12
+   * loaded", which would look like a failed search rather than an answer.
+   */
+  const askingWhoAmI = query === "whoami" || query === "whoami?";
+
+  const visible = askingWhoAmI
+    ? []
+    : query
     ? notes.filter((n) => {
         const plain = stripMarkup(n.body).toLowerCase();
         return (
@@ -115,16 +130,40 @@ export default function Board({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
         />
-        {query && (
+        {/* Hidden while asking: "0 of 12 loaded" beside an answer reads as a
+            failed search. */}
+        {query && !askingWhoAmI && (
           <span className="search-count">
             {visible.length} of {notes.length} loaded
           </span>
         )}
       </div>
 
+      {/* The board is anonymous to everyone else, so this is the one place a
+          reader can confirm who they are — and the only place their display name
+          is ever shown back to them, since it is hidden everywhere else. */}
+      {askingWhoAmI && user && (
+        <div className="whoami">
+          <p className="chalk-dot big" style={{ backgroundColor: user.color }} />
+          {/* The handle is the headline, because it is the only part of your
+              identity the board shows anybody. A display name, if you have set
+              one, is the smaller line — it is a note to yourself here, not a
+              name you are known by. */}
+          <p className="whoami-name">@{user.handle}</p>
+          {user.displayName && (
+            <p className="whoami-handle">{user.displayName}</p>
+          )}
+          <p className="whoami-note">
+            On here since {new Date(user.createdAt).toLocaleDateString()}. Nobody
+            else on the board can see this — your notes carry only your handle
+            and chalk.
+          </p>
+        </div>
+      )}
+
       <div className="notes-grid">
         {notes.length === 0 && <p className="empty">{emptyMessage}</p>}
-        {notes.length > 0 && visible.length === 0 && (
+        {notes.length > 0 && visible.length === 0 && !askingWhoAmI && (
           <p className="empty">no matches for “{search}” in the notes you have loaded</p>
         )}
 
@@ -142,7 +181,9 @@ export default function Board({
         ))}
       </div>
 
-      {hasMore && (
+      {/* Suppressed while asking: paging the board you just asked to be told
+          where you are would answer a different question. */}
+      {hasMore && !askingWhoAmI && (
         <div className="load-more-wrap">
           <button
             type="button"

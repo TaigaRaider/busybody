@@ -51,6 +51,8 @@ export default function Sidebar({
   onGhost,
   onRevive,
   ghosting,
+  onDeleteAccount,
+  deleting,
   drawerOpen,
   onCloseDrawer,
 }) {
@@ -64,6 +66,9 @@ export default function Sidebar({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [rekeyError, setRekeyError] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState(null);
   const [discoverQuery, setDiscoverQuery] = useState("");
 
   const closeRekey = () => {
@@ -82,6 +87,24 @@ export default function Sidebar({
     // the current password, and wiping it would make the form look broken.
     if (result?.ok) closeRekey();
     else setRekeyError(result?.message || "Could not change the password.");
+  };
+
+  const closeDelete = () => {
+    setConfirmDelete(false);
+    setDeletePassword("");
+    setDeleteError(null);
+  };
+
+  const submitDelete = async (event) => {
+    event.preventDefault();
+    if (!deletePassword || deleting) return;
+    setDeleteError(null);
+    const result = await onDeleteAccount(deletePassword);
+    // Only on failure. On success the whole shell is replaced by the auth gate,
+    // so there is nothing left to tidy - and on an OWNS_SPACES refusal the user
+    // needs the password still in the box to go and deal with the spaces.
+    if (result?.ok) closeDelete();
+    else setDeleteError(result?.message || "Could not delete the account.");
   };
 
   // The one flag the whole feature turns on. The server is the authority - this
@@ -369,10 +392,60 @@ export default function Sidebar({
                   👻
                 </button>
               ))}
+            {/* Offered to ghosts too, and deliberately not behind the two-step
+                confirm the ghost button uses. Deleting asks for the password in a
+                form that spells out what survives, which is a different and much
+                harder barrier than a second click; and the person who most wants
+                the permanent exit is often the one already a ghost. */}
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setConfirmDelete((open) => !open)}
+              title="Delete your account for good"
+            >
+              🗑
+            </button>
             <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
               ⏻
             </button>
           </div>
+
+          {confirmDelete && (
+            <form className="rekey depart" onSubmit={submitDelete}>
+              <p className="rekey-title">delete @{user.handle} for good</p>
+              <p className="rekey-note">
+                This cannot be undone and there is no way back: your account, your
+                spaces, your memberships and your mentions go. Every note you wrote
+                stays exactly where it is, with your name on it in grey —{" "}
+                <strong>@{user.handle} stays retired</strong>, so nobody else can take
+                it. If you would rather step away and come back later, ghosting
+                does that instead.
+              </p>
+              <input
+                className="gate-input"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="your password, to confirm"
+                autoComplete="current-password"
+                autoFocus
+                spellCheck={false}
+              />
+              {deleteError && <p className="gate-error">{deleteError}</p>}
+              <div className="rekey-actions">
+                <button
+                  type="submit"
+                  className="danger"
+                  disabled={!deletePassword || deleting}
+                >
+                  {deleting ? "deleting…" : "delete my account"}
+                </button>
+                <button type="button" className="ghost" onClick={closeDelete}>
+                  cancel
+                </button>
+              </div>
+            </form>
+          )}
 
           {rekeying && (
             <form className="rekey" onSubmit={submitRekey}>

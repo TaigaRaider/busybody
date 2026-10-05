@@ -134,6 +134,7 @@ describe("legacy migration", () => {
       "notes",
       "note_mentions",
       "note_layouts",
+      "retired_handles",
     ]) {
       assert.ok(names.includes(expected), `missing table ${expected}`);
     }
@@ -258,7 +259,49 @@ describe("legacy migration", () => {
     assert.equal((await reader.del("/notes/7")).status, 403);
   });
 
+  /* ------------------------- departed authors ------------------------- */
+
+  it("adds author_handle to a notes table that predates it", async () => {
+    // The legacy seed has no author_handle, so this asserts the ALTER ran rather
+    // than the no-op branch a freshly bootstrapped database takes.
+    const cols = await columns("notes");
+    assert.ok(cols.includes("author_handle"), "author_handle should have been added");
+  });
+
+  it("backfills the byline from the author still on record", async () => {
+    // Without this every note already on the board would collapse to
+    // "archived" the first time its author deleted their account.
+    const rows = await db.execute(
+      `SELECT id, author_id, author_handle FROM notes ORDER BY id`,
+    );
+    for (const row of rows.rows) {
+      const author = await db.execute(`SELECT handle FROM users WHERE id = ?`, [
+        row.author_id,
+      ]);
+      assert.equal(
+        row.author_handle,
+        author.rows[0]?.handle ?? null,
+        `note ${row.id} should carry its author's handle`,
+      );
+    }
+    // The two legacy notes share one placeholder account, so they share a
+    // byline too — the migration must not invent a second one.
+    assert.equal(rows.rows[0].author_handle, "anon-aaaaaaaa-bbb");
+    assert.equal(rows.rows[0].author_handle, rows.rows[1].author_handle);
+  });
+
+  it("leaves the authorless note without a handle", async () => {
+    // The distinction that keeps "archived" meaningful: a NULL author_id with a
+    // handle means the author deleted their account; both NULL means the note
+    // never had one.
+    const row = await db.execute(`SELECT author_id, author_handle FROM notes WHERE id = 7`);
+    assert.equal(row.rows[0].author_id, null);
+    assert.equal(row.rows[0].author_handle, null);
+  });
+
   it("lets the env admin delete an archived note", async () => {
+    // Last, because it is the only destructive step here and the assertions
+    // above need that authorless note still standing.
     assert.equal((await admin.del("/notes/7")).status, 204);
   });
 });

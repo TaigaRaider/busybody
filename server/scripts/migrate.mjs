@@ -13,6 +13,9 @@
  *   - new: users, spaces, space_members, space_requests, note_mentions,
  *          note_layouts
  *   - users gains ghosted_at    -> NULL means a live account
+ *   - notes gains author_handle  -> the byline a note keeps after its author
+ *                                   deletes their account
+ *   - new: retired_handles       -> deleted accounts' handles, unclaimable
  *
  * Legacy notes keep an "archived author" placeholder user keyed off the old
  * uuid prefix. Because those users have no known credential, only an admin can
@@ -76,9 +79,17 @@ const BOOTSTRAP = [
      body TEXT,
      author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
      author_color TEXT,
+     author_handle TEXT,
      created_at TEXT NOT NULL,
      updated_at TEXT NOT NULL,
      history TEXT NOT NULL DEFAULT '[]'
+   )`,
+
+  // Handles of deleted accounts, kept unclaimable so a grey byline cannot be
+  // impersonated by whoever registers the name next.
+  `CREATE TABLE IF NOT EXISTS retired_handles (
+     handle TEXT PRIMARY KEY,
+     deleted_at TEXT NOT NULL
    )`,
 
   `CREATE TABLE IF NOT EXISTS note_mentions (
@@ -243,6 +254,32 @@ async function ensureGhostColumn(client, log) {
 }
 
 /**
+ * Adds `notes.author_handle` and backfills it from the author still on record.
+ *
+ * The column is the byline a note keeps after its author deletes their account,
+ * so the backfill matters: without it every note already on the board would
+ * collapse to "archived" the first time somebody left. Runs after
+ * `upgradeNotes`, which is what creates the anon-* placeholder users the
+ * backfill reads from.
+ */
+async function ensureAuthorHandleColumn(client, log) {
+  if (await columnExists(client, "notes", "author_handle")) {
+    log("notes.author_handle already present");
+    return;
+  }
+  log("adding notes.author_handle");
+  await client.execute("ALTER TABLE notes ADD COLUMN author_handle TEXT");
+  // Only for rows that still have an author; the authorless legacy notes keep a
+  // NULL handle, which is what distinguishes them from a departed author.
+  await client.execute(`
+    UPDATE notes SET author_handle = (
+      SELECT u.handle FROM users u WHERE u.id = notes.author_id
+    )
+    WHERE author_id IS NOT NULL
+  `);
+}
+
+/**
  * The `notes` indexes can only be created once the table is in its current
  * shape, so this runs after `upgradeNotes` rather than as part of the
  * bootstrap. Against a fresh database the table is already correct.
@@ -269,6 +306,7 @@ export async function migrate({ log = () => {} } = {}) {
     await upgradeNotes(client, log);
     await ensurePasswordColumn(client, log);
     await ensureGhostColumn(client, log);
+    await ensureAuthorHandleColumn(client, log);
     await ensureNoteIndexes(client);
     log("migration complete");
   } finally {
