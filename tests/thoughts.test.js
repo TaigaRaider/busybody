@@ -31,24 +31,28 @@ describe("attributed thoughts", () => {
   const post = (api, body, title = "topic") =>
     api.post("/notes", { title, body });
 
-  // Named throwaway accounts for the permission and deletion tests. The four
-  // `makeUsers` accounts above already hold PALETTE[0..3], so these take the
-  // remaining four chalk colours.
+  // Named throwaway accounts for the permission and deletion tests. Chalk is
+  // unique per user, so registration walks the palette until a free colour is
+  // found; every colour freed by a deleted account is retried from the start.
   const extra = [];
   const make = async (handle) => {
     const api = clientFor(server.base);
-    const res = await api.register(
-      handle,
-      PALETTE[4 + (extra.length % 4)],
-      TEST_PASSWORD,
-    );
-    assert.equal(
-      res.status,
-      201,
-      `could not register ${handle}: ${JSON.stringify(res.body)}`,
-    );
-    extra.push(handle);
-    return { handle, api, user: res.body.user, password: TEST_PASSWORD };
+    for (let attempt = 0; attempt < PALETTE.length; attempt += 1) {
+      const color = PALETTE[(extra.length + attempt) % PALETTE.length];
+      const res = await api.register(handle, color, TEST_PASSWORD);
+      if (res.status === 201) {
+        extra.push(handle);
+        return { handle, api, user: res.body.user, password: TEST_PASSWORD };
+      }
+      if (res.body?.code !== "CONFLICT" || res.body?.field !== "color") {
+        assert.equal(
+          res.status,
+          201,
+          `could not register ${handle}: ${JSON.stringify(res.body)}`,
+        );
+      }
+    }
+    throw new Error(`no free chalk left for ${handle}`);
   };
 
   /* ------------------------------ the opening ------------------------------ */
@@ -379,5 +383,140 @@ describe("attributed thoughts", () => {
       { text: "rewritten" },
     );
     assert.equal(res.status, 403);
+  });
+
+  /* ---------------------- deleting a shared card ---------------------- */
+
+  it("lets a single-writer card be deleted outright", async () => {
+    const created = await post(ada.api, "solo card");
+    assert.equal(created.body.deleteVote, null, "no poll: nobody else to consult");
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 204);
+    const list = await ada.api.get("/notes");
+    assert.ok(!list.body.items.some((n) => n.id === created.body.id));
+  });
+
+  it("holds the author's delete until the other writer consents", async () => {
+    const created = await post(ada.api, "shared with bob");
+    await bob.api.post(`/notes/${created.body.id}/thoughts`, { text: "bob sits here" });
+
+    // both writers see the poll; the author's own consent can never tip it
+    const view = await ada.api.get("/notes");
+    const found = view.body.items.find((n) => n.id === created.body.id);
+    assert.deepEqual(found.deleteVote, {
+      approved: false,
+      consents: 0,
+      contributors: 1,
+      canVote: true,
+      voted: false,
+    });
+
+    const refused = await ada.api.del(`/notes/${created.body.id}`);
+    assert.equal(refused.status, 403);
+    assert.equal(refused.body.code, "NEEDS_DELETE_VOTES");
+
+    // her own vote leaves the count untouched: the poll counts the *other* writer
+    const selfVote = await ada.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(selfVote.status, 200);
+    assert.equal(selfVote.body.deleteVote.approved, false);
+    assert.equal(selfVote.body.deleteVote.consents, 0);
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 403);
+
+    // bob's consent unlocks it, and the card comes down with the poll
+    const bobVote = await bob.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(bobVote.status, 200);
+    assert.equal(bobVote.body.deleteVote.approved, true);
+    assert.equal(bobVote.body.deleteVote.consents, 1);
+    assert.equal(bobVote.body.deleteVote.voted, true);
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 204);
+    const after = await ada.api.get("/notes");
+    assert.ok(!after.body.items.some((n) => n.id === created.body.id));
+    // the poll died with the card
+    assert.equal(
+      (await bob.api.post(`/notes/${created.body.id}/delete-vote`)).status,
+      404,
+    );
+  });
+
+  it("needs at least half of the other contributors, rounded up", async () => {
+    const created = await post(ada.api, "three voices");
+    await bob.api.post(`/notes/${created.body.id}/thoughts`, { text: "b" });
+    await carol.api.post(`/notes/${created.body.id}/thoughts`, { text: "c" });
+    // ada requests: two other writers, so one consent is a bare majority
+    const one = await bob.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(one.body.deleteVote.approved, true);
+    assert.deepEqual(
+      {
+        consents: one.body.deleteVote.consents,
+        contributors: one.body.deleteVote.contributors,
+      },
+      { consents: 1, contributors: 2 },
+    );
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 204);
+
+    // …and with three other writers, one consent is not enough
+    const three = await post(ada.api, "four voices");
+    await bob.api.post(`/notes/${three.body.id}/thoughts`, { text: "b" });
+    await carol.api.post(`/notes/${three.body.id}/thoughts`, { text: "c" });
+    await owner.api.post(`/notes/${three.body.id}/thoughts`, { text: "o" });
+    const partial = await bob.api.post(`/notes/${three.body.id}/delete-vote`);
+    assert.equal(partial.body.deleteVote.approved, false);
+    assert.equal(partial.body.deleteVote.contributors, 3);
+    assert.equal((await ada.api.del(`/notes/${three.body.id}`)).status, 403);
+    const enough = await carol.api.post(`/notes/${three.body.id}/delete-vote`);
+    assert.equal(enough.body.deleteVote.approved, true);
+    assert.equal((await ada.api.del(`/notes/${three.body.id}`)).status, 204);
+  });
+
+  it("refuses a vote from someone who never wrote on the card", async () => {
+    const created = await post(ada.api, "private clearance");
+    await bob.api.post(`/notes/${created.body.id}/thoughts`, { text: "b" });
+    const res = await carol.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, "NOT_CONTRIBUTOR");
+  });
+
+  it("lets a space moderator take a shared card down without a poll", async () => {
+    const room = (
+      await owner.api.post("/spaces", { name: "Managed Floor", visibility: "private" })
+    ).body;
+    assert.equal(
+      (await owner.api.post(`/spaces/${room.id}/members`, { handle: ada.handle, role: "participant" })).status,
+      201,
+    );
+    assert.equal(
+      (await owner.api.post(`/spaces/${room.id}/members`, { handle: carol.handle, role: "moderator" })).status,
+      201,
+    );
+    const note = (await ada.api.post(`/spaces/${room.id}/notes`, { title: "moderated", body: "opening" })).body;
+    await owner.api.post(`/notes/${note.id}/thoughts`, { text: "the owner writes too" });
+    assert.equal((await carol.api.del(`/notes/${note.id}`)).status, 204);
+  });
+
+  it("lets the admin take a shared card down without a poll", async () => {
+    const created = await post(ada.api, "admin clears it");
+    await bob.api.post(`/notes/${created.body.id}/thoughts`, { text: "b" });
+    assert.equal((await admin.del(`/notes/${created.body.id}`)).status, 204);
+  });
+
+  it("forgets a departed writer's consent, and their spot in the count", async () => {
+    const fleeting = await make("fleeting");
+    const created = await post(ada.api, "consent outlives nobody");
+    await bob.api.post(`/notes/${created.body.id}/thoughts`, { text: "bob stays" });
+    await fleeting.api.post(`/notes/${created.body.id}/thoughts`, { text: "fleeting stays" });
+
+    // fleeting's single consent is enough for a two-other-writer poll…
+    const voted = await fleeting.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(voted.body.deleteVote.approved, true);
+    assert.equal(voted.body.deleteVote.consents, 1);
+
+    // …until the account is gone, and the author is back to asking
+    assert.equal(
+      (await fleeting.api.del("/auth/me", { password: TEST_PASSWORD })).status,
+      204,
+    );
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 403);
+    const revote = await bob.api.post(`/notes/${created.body.id}/delete-vote`);
+    assert.equal(revote.body.deleteVote.approved, true);
+    assert.equal((await ada.api.del(`/notes/${created.body.id}`)).status, 204);
   });
 });

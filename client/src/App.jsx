@@ -19,6 +19,7 @@ import {
   reviveAccount,
   setNoteSize,
   updateNote,
+  voteToDelete,
 } from "./api";
 import { clearSession, loadSession, saveSession, updateStoredUser } from "./session";
 import { stripMarkup } from "../../lib/richtext";
@@ -358,6 +359,22 @@ export default function App() {
       notify("Note deleted");
     } catch (err) {
       notify(err?.response?.data?.error || "Could not delete the note", "error");
+    }
+  };
+
+  /**
+   * Record your consent to removing a card. Only people who wrote on the card
+   * get a vote; once enough of them agree, the author's delete goes through.
+   */
+  const handleDeleteVote = async (note) => {
+    try {
+      const saved = await voteToDelete(note.id);
+      setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+      const agreed = saved.deleteVote?.consents ?? 0;
+      const total = saved.deleteVote?.contributors ?? 0;
+      notify(`Consent recorded — ${agreed} of ${total} contributors agree`);
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not record the vote", "error");
     }
   };
 
@@ -727,6 +744,7 @@ export default function App() {
                     canResize={!ghosted}
                     onAppend={handleAppend}
                     onEditThought={handleEditThought}
+                    onDeleteVote={handleDeleteVote}
                     onTag={(handle) => {
                       setSearch(`@${handle}`);
                       setView("board");
@@ -768,6 +786,7 @@ export default function App() {
               onResize={handleResize}
               onAppend={handleAppend}
               onEditThought={handleEditThought}
+              onDeleteVote={handleDeleteVote}
               onTag={(handle) => setSearch(`@${handle}`)}
               hasMore={hasMore}
               loadingMore={loadingMore}

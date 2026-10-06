@@ -1273,6 +1273,40 @@ button.ghost.danger:hover {
   margin-top: 6px;
 }
 
+/* The consent poll that guards removing a card other people have written on.
+   While it is open the author's × sits greyed out and every contributor sees
+   the running count; the non-author contributors get the vote button. */
+.delete-consent {
+  margin-top: 10px;
+  border-top: 1px dashed var(--gray-800);
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.delete-consent-note {
+  margin: 0;
+  color: var(--gray-500);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.delete-consent-vote {
+  flex: 0 0 auto;
+}
+
+.note-card .remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.note-card .remove:disabled:hover {
+  color: var(--gray-600);
+}
+
 .card-buttons-top-right {
   position: absolute;
   top: 6px;

@@ -19,6 +19,9 @@
  *   - new: note_thoughts         -> every card's attributed thoughts; the
  *                                   author's opening is backfilled from the
  *                                   note's own fields
+ *   - new: note_deletion_votes   -> contributors' consent to delete a shared
+ *                                   card, collected before the author may
+ *                                   remove it
  *
  * Legacy notes keep an "archived author" placeholder user keyed off the old
  * uuid prefix. Because those users have no known credential, only an admin can
@@ -131,6 +134,18 @@ const BOOTSTRAP = [
      updated_at TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS note_thoughts_note_idx ON note_thoughts(note_id, id)`,
+
+  // Contributor consent to delete a card that carries other people's thoughts.
+  // A row means "this contributor agrees the card should go". At least half of
+  // the other live contributors must consent before the author may remove it;
+  // admins and space moderators bypass the poll (see the delete route).
+  `CREATE TABLE IF NOT EXISTS note_deletion_votes (
+     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (note_id, user_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS note_deletion_votes_note_idx ON note_deletion_votes(note_id)`,
 ];
 
 async function tableExists(client, name) {

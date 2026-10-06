@@ -138,6 +138,13 @@ export const appendThought = (noteId, text) =>
 export const editThought = (noteId, thoughtId, text) =>
   data(api.put(`/notes/${noteId}/thoughts/${thoughtId}`, { text }));
 
+/**
+ * Add your consent to removing a card. Only the people who wrote on the card
+ * have a vote, and the vote is permanent.
+ */
+export const voteToDelete = (noteId) =>
+  data(api.post(`/notes/${noteId}/delete-vote`));
+
 /** Persists this user's bento size for a card. */
 export const setNoteSize = (id, size) => data(api.put(`/notes/${id}/layout`, { size }));
 

@@ -54,11 +54,19 @@ export default function NoteCard({
   onResize,
   onAppend,
   onEditThought,
+  onDeleteVote,
   onTag,
   canResize = true,
 }) {
   const perm = note.perm || {};
   const edited = note.updatedAt && note.updatedAt !== note.createdAt;
+
+  // The consent poll to remove a shared card, when one is open. `null`/absent
+  // means the card has no other writer to consult and deletes as it always
+  // did. While pending, the × is disabled and the count below it is what the
+  // author waits on; other contributors get the "vote to delete" button.
+  const vote = note.deleteVote || null;
+  const deletePending = vote && !vote.approved;
 
   // The card's attributed thoughts, opening first. Every stored note has at
   // least the author's opening (the migration backfills it), but a stale
@@ -147,7 +155,17 @@ export default function NoteCard({
           </button>
         )}
         {perm.canDelete && (
-          <button type="button" className="remove" title="Delete" onClick={() => onDelete(note)}>
+          <button
+            type="button"
+            className="remove"
+            title={
+              deletePending
+                ? `Waiting for consent — ${vote.consents} of ${vote.contributors} contributors agree`
+                : "Delete"
+            }
+            disabled={deletePending}
+            onClick={() => onDelete(note)}
+          >
             ×
           </button>
         )}
@@ -281,6 +299,24 @@ export default function NoteCard({
                 {appending ? "adding…" : "append thought"}
               </button>
             </div>
+          </div>
+        )}
+
+        {deletePending && (
+          <div className="delete-consent">
+            <p className="delete-consent-note">
+              ⚖ Removing this card needs the other writers to agree —{" "}
+              {vote.consents} of {vote.contributors} have.
+            </p>
+            {vote.canVote && !perm.isMine && (
+              <button
+                type="button"
+                className="ghost delete-consent-vote"
+                onClick={() => onDeleteVote?.(note)}
+              >
+                vote to delete
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -135,6 +135,7 @@ describe("legacy migration", () => {
       "note_mentions",
       "note_layouts",
       "note_thoughts",
+      "note_deletion_votes",
       "retired_handles",
     ]) {
       assert.ok(names.includes(expected), `missing table ${expected}`);
