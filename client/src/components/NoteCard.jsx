@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { renderRuns } from "../../../lib/richtext";
 
 const SIZES = ["small", "wide", "tall", "big"];
@@ -14,6 +15,32 @@ function timeAgo(dateStr) {
 }
 
 /**
+ * The one shared renderer for a thought's text: colour spans become chalk and
+ * `@handle` tags become tappable mention chips, exactly as they do in the body
+ * of a single-writer card.
+ */
+function ThoughtRuns({ text, color, mentions, onTag }) {
+  return renderRuns(`{% ${color} %}${text}{% end %}`, mentions || {}).map((run, i) =>
+    run.type === "mention" ? (
+      <button
+        key={i}
+        type="button"
+        className="mention"
+        style={{ color: run.color }}
+        title={run.userId ? `Notes mentioning @${run.handle}` : `@${run.handle} (no account)`}
+        onClick={() => onTag(run.handle)}
+      >
+        {run.text}
+      </button>
+    ) : (
+      <span key={i} style={{ color: run.color }}>
+        {run.text}
+      </span>
+    ),
+  );
+}
+
+/**
  * `canResize` is separate from the note permissions on purpose: the bento size
  * is a personal layout preference, so a reader who may not touch a single word
  * still gets it. It is also the one preference the server refuses a ghost,
@@ -25,12 +52,76 @@ export default function NoteCard({
   onDelete,
   onRollback,
   onResize,
+  onAppend,
+  onEditThought,
   onTag,
   canResize = true,
 }) {
-  const runs = renderRuns(note.body, note.mentions || {});
   const perm = note.perm || {};
   const edited = note.updatedAt && note.updatedAt !== note.createdAt;
+
+  // The card's attributed thoughts, opening first. Every stored note has at
+  // least the author's opening (the migration backfills it), but a stale
+  // cached note could lack the array, so fall back to an empty one.
+  const thoughts = note.thoughts?.length ? note.thoughts : [];
+  const multiThought = thoughts.length > 1;
+
+  const [appending, setAppending] = useState(false);
+  const [appendText, setAppendText] = useState("");
+  const [editingThought, setEditingThought] = useState(null); // thought id + draft
+  const [thoughtBusy, setThoughtBusy] = useState(false);
+
+  const submitAppend = async () => {
+    const text = appendText.trim();
+    if (!text || !onAppend || appending) return;
+    setAppending(true);
+    try {
+      await onAppend(note, text);
+      setAppendText("");
+    } catch {
+      /* the toast already said why; keep the draft so nothing is lost */
+    } finally {
+      setAppending(false);
+    }
+  };
+
+  const saveThought = async () => {
+    if (!editingThought || thoughtBusy || !editingThought.draft.trim()) return;
+    setThoughtBusy(true);
+    try {
+      await onEditThought(note, editingThought.id, editingThought.draft.trim());
+      setEditingThought(null);
+    } catch {
+      /* keep the editor open with the draft, per the toast's explanation */
+    } finally {
+      setThoughtBusy(false);
+    }
+  };
+
+  const runs =
+    multiThought
+      ? []
+      : renderRuns(note.body, note.mentions || {});
+
+  /** A thought's byline: chalk dot, handle, time, and an "edited" marker. */
+  const thoughtByline = (thought) => (
+    <p className="thought-byline">
+      <span className="chalk-dot" style={{ backgroundColor: thought.color }} />
+      {/* Same byline states as a note: live, departed (greyed), never had one. */}
+      {thought.author ? (
+        <span className={thought.author.gone ? "author-gone" : undefined}>
+          @{thought.author.handle}
+        </span>
+      ) : (
+        "archived"
+      )}
+      {" · "}
+      {timeAgo(thought.createdAt)}
+      {thought.updatedAt !== thought.createdAt
+        ? ` · edited ${timeAgo(thought.updatedAt)}`
+        : ""}
+    </p>
+  );
 
   return (
     <article className={`note-card ${note.size}`}>
@@ -64,43 +155,134 @@ export default function NoteCard({
 
       <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
         {note.title && <h2>{note.title}</h2>}
-        <div className="body-colored">
-          {runs.map((run, i) =>
-            run.type === "mention" ? (
+
+        {multiThought ? (
+          /* A card with appended thoughts renders each one as its own block:
+             the author's opening first, then every append, each chalked and
+             bylined with its writer. None of them is a runway for rewriting
+             anyone else's — the pencil appears only on your own thought and
+             only while the server's edit window is still open. */
+          <div className="thought-stack">
+            {thoughts.map((thought) => (
+              <div key={thought.id} className="thought">
+                <div className="body-colored">
+                  <ThoughtRuns
+                    text={thought.text}
+                    color={thought.color}
+                    mentions={note.mentions}
+                    onTag={onTag}
+                  />
+                </div>
+                {editingThought?.id === thought.id ? (
+                  <div className="thought-edit">
+                    <textarea
+                      rows={3}
+                      value={editingThought.draft}
+                      autoFocus
+                      onChange={(e) =>
+                        setEditingThought({ id: thought.id, draft: e.target.value })
+                      }
+                    />
+                    <div className="thought-edit-actions">
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={thoughtBusy || !editingThought.draft.trim()}
+                        onClick={saveThought}
+                      >
+                        {thoughtBusy ? "saving…" : "save"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => setEditingThought(null)}
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="thought-foot">
+                    {thoughtByline(thought)}
+                    {thought.perm?.canEdit && (
+                      <button
+                        type="button"
+                        className="thought-edit-button"
+                        title="Edit your thought"
+                        onClick={() =>
+                          setEditingThought({ id: thought.id, draft: thought.text })
+                        }
+                      >
+                        ✎
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* A single-writer card keeps exactly the rendering it always had. */
+          <>
+            <div className="body-colored">
+              {runs.map((run, i) =>
+                run.type === "mention" ? (
+                  <button
+                    key={i}
+                    type="button"
+                    className="mention"
+                    style={{ color: run.color }}
+                    title={run.userId ? `Notes mentioning @${run.handle}` : `@${run.handle} (no account)`}
+                    onClick={() => onTag(run.handle)}
+                  >
+                    {run.text}
+                  </button>
+                ) : (
+                  <span key={i} style={{ color: run.color }}>
+                    {run.text}
+                  </span>
+                ),
+              )}
+            </div>
+            <p className="note-timestamp">
+              <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
+              {/* Three bylines, told apart by `gone`: a live account, a departed one
+                  (the server sends the snapshot handle with `gone: true`), or a note
+                  that never had an author at all. Collapsing the middle case into
+                  "archived" would claim it was anonymous, which it was not. */}
+              {note.author ? (
+                <span className={note.author.gone ? "author-gone" : undefined}>
+                  @{note.author.handle}
+                </span>
+              ) : (
+                "archived"
+              )}
+              {" · "}
+              {timeAgo(note.createdAt)}
+              {edited ? ` · edited ${timeAgo(note.updatedAt)}` : ""}
+            </p>
+          </>
+        )}
+
+        {perm.canAppend && (
+          <div className="append-box">
+            <textarea
+              rows={2}
+              placeholder="add your own thought…"
+              value={appendText}
+              onChange={(e) => setAppendText(e.target.value)}
+            />
+            <div className="append-actions">
               <button
-                key={i}
                 type="button"
-                className="mention"
-                style={{ color: run.color }}
-                title={run.userId ? `Notes mentioning @${run.handle}` : `@${run.handle} (no account)`}
-                onClick={() => onTag(run.handle)}
+                disabled={appending || !appendText.trim()}
+                onClick={submitAppend}
               >
-                {run.text}
+                {appending ? "adding…" : "append thought"}
               </button>
-            ) : (
-              <span key={i} style={{ color: run.color }}>
-                {run.text}
-              </span>
-            ),
-          )}
-        </div>
-        <p className="note-timestamp">
-          <span className="chalk-dot" style={{ backgroundColor: note.authorColor || "var(--gray-600)" }} />
-          {/* Three bylines, told apart by `gone`: a live account, a departed one
-              (the server sends the snapshot handle with `gone: true`), or a note
-              that never had an author at all. Collapsing the middle case into
-              "archived" would claim it was anonymous, which it was not. */}
-          {note.author ? (
-            <span className={note.author.gone ? "author-gone" : undefined}>
-              @{note.author.handle}
-            </span>
-          ) : (
-            "archived"
-          )}
-          {" · "}
-          {timeAgo(note.createdAt)}
-          {edited ? ` · edited ${timeAgo(note.updatedAt)}` : ""}
-        </p>
+            </div>
+          </div>
+        )}
       </div>
     </article>
   );

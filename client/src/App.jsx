@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  appendThought,
   cancelRequest,
   changePassword,
   createNote,
   createSpace,
   deleteAccount,
   deleteNote,
+  editThought,
   fetchMe,
   fetchMentions,
   fetchNotes,
@@ -19,7 +21,7 @@ import {
   updateNote,
 } from "./api";
 import { clearSession, loadSession, saveSession, updateStoredUser } from "./session";
-import { parseColorSegments, rebuildColorBody, stripMarkup } from "../../lib/richtext";
+import { stripMarkup } from "../../lib/richtext";
 import AuthGate from "./components/AuthGate";
 import Sidebar from "./components/Sidebar";
 import Board from "./components/Board";
@@ -284,14 +286,11 @@ export default function App() {
     setBusy(true);
     try {
       if (editing) {
-        // Re-apply per-span colour markup around the edited plain text so other
-        // contributors' chalk survives an edit.
-        const tagged = rebuildColorBody(
-          body,
-          parseColorSegments(editing.body),
-          me?.user?.color || "#ffffff",
-        );
-        const saved = await updateNote(editing.id, { title, body: tagged });
+        // Editing a card means editing its opening thought: title plus the
+        // author's own text, sent plain. The server recomposes the card body
+        // from every thought, so other people's appends stay exactly as they
+        // are - never re-chalked, never overwritten.
+        const saved = await updateNote(editing.id, { title, body });
         setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
         setEditing(null);
       } else {
@@ -309,8 +308,47 @@ export default function App() {
     }
   };
 
-  const startEdit = (note) =>
-    setEditing({ id: note.id, title: note.title, body: note.body, plainBody: stripMarkup(note.body) });
+  /**
+   * The edit form works on the opening thought only: its title and the
+   * author's own text. Other thoughts are other people's, so they are never
+   * prefilled into an editor that could swallow them.
+   */
+  const startEdit = (note) => {
+    const opening = note.thoughts?.[0];
+    setEditing({
+      id: note.id,
+      title: note.title,
+      body: opening ? opening.text : stripMarkup(note.body),
+      plainBody: opening ? opening.text : stripMarkup(note.body),
+    });
+  };
+
+  /** Append a thought of your own to a card - its content stays yours. */
+  const handleAppend = async (note, text) => {
+    try {
+      const saved = await appendThought(note.id, text);
+      setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+      notify("Thought added");
+    } catch (err) {
+      notify(err?.response?.data?.error || "Could not add the thought", "error");
+      throw err;
+    }
+  };
+
+  /** Correct your own appended thought, while its window is still open. */
+  const handleEditThought = async (note, thoughtId, text) => {
+    try {
+      const saved = await editThought(note.id, thoughtId, text);
+      setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+      notify("Thought updated");
+    } catch (err) {
+      notify(
+        err?.response?.data?.error || "Could not save the thought",
+        "error",
+      );
+      throw err;
+    }
+  };
 
   const handleDelete = async (note) => {
     try {
@@ -687,6 +725,8 @@ export default function App() {
                     onRollback={handleRollback}
                     onResize={handleResize}
                     canResize={!ghosted}
+                    onAppend={handleAppend}
+                    onEditThought={handleEditThought}
                     onTag={(handle) => {
                       setSearch(`@${handle}`);
                       setView("board");
@@ -726,6 +766,8 @@ export default function App() {
               onDelete={handleDelete}
               onRollback={handleRollback}
               onResize={handleResize}
+              onAppend={handleAppend}
+              onEditThought={handleEditThought}
               onTag={(handle) => setSearch(`@${handle}`)}
               hasMore={hasMore}
               loadingMore={loadingMore}

@@ -194,16 +194,12 @@ describe("the delete-account operator script", () => {
     });
   });
 
-  it("leaves the note community-editable but impossible to delete", async () => {
-    // Rewriting follows the Lobby's open-editing rule; deletion was the power
-    // that died with the account, and nobody else may claim it.
+  it("leaves nobody able to touch what they wrote", async () => {
     const lobby = await bystander.get("/notes");
     const note = lobby.body.items.find((n) => n.title === "lobby note");
-    assert.equal(note.perm.canEdit, true);
-    assert.equal(note.perm.canDelete, false, "deletion power died with the account");
+    assert.equal(note.perm.canEdit, false);
+    assert.equal(note.perm.canDelete, false);
     assert.equal((await bystander.del(`/notes/${note.id}`)).status, 403);
-    const edited = await bystander.put(`/notes/${note.id}`, { body: "community edit" });
-    assert.equal(edited.status, 200);
   });
 
   it("retires the handle, so the grey byline cannot be impersonated", async () => {

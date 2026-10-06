@@ -127,6 +127,17 @@ export const updateNote = (id, payload) => data(api.put(`/notes/${id}`, payload)
 export const deleteNote = (id) => api.delete(`/notes/${id}`);
 export const rollbackNote = (id) => data(api.put(`/notes/${id}/rollback`));
 
+/**
+ * Append your own thought to a card. The append is chalked and bylined with
+ * your account and stays yours — only you, and only briefly, can edit it.
+ */
+export const appendThought = (noteId, text) =>
+  data(api.post(`/notes/${noteId}/thoughts`, { text }));
+
+/** Edit your own appended thought, while its edit window is still open. */
+export const editThought = (noteId, thoughtId, text) =>
+  data(api.put(`/notes/${noteId}/thoughts/${thoughtId}`, { text }));
+
 /** Persists this user's bento size for a card. */
 export const setNoteSize = (id, size) => data(api.put(`/notes/${id}/layout`, { size }));
 

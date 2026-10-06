@@ -19,6 +19,8 @@ export default function Board({
   onDelete,
   onRollback,
   onResize,
+  onAppend,
+  onEditThought,
   onTag,
   hasMore,
   loadingMore,
@@ -175,6 +177,8 @@ export default function Board({
             onDelete={onDelete}
             onRollback={onRollback}
             onResize={onResize}
+            onAppend={onAppend}
+            onEditThought={onEditThought}
             onTag={onTag}
             canResize={!ghosted}
           />

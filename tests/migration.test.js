@@ -134,6 +134,7 @@ describe("legacy migration", () => {
       "notes",
       "note_mentions",
       "note_layouts",
+      "note_thoughts",
       "retired_handles",
     ]) {
       assert.ok(names.includes(expected), `missing table ${expected}`);
@@ -242,11 +243,9 @@ describe("legacy migration", () => {
     assert.equal(res.body.items.find((n) => n.id === 7).author, null);
   });
 
-  it("locks archived notes against ordinary deletion", async () => {
+  it("locks archived notes against ordinary accounts", async () => {
     // Placeholder users have no credential, so only a superuser can remove the
-    // notes they are credited with. Rewriting one stays open like any Lobby
-    // post — the Lobby is community-editable — but taking it down still
-    // requires the author's power, which a placeholder does not possess.
+    // notes they are credited with.
     const reader = clientFor(`http://127.0.0.1:${server.address().port}`);
     const created = await reader.register("newcomer", "#61afef");
     assert.equal(created.status, 201);
@@ -254,8 +253,8 @@ describe("legacy migration", () => {
     const list = await reader.get("/notes");
     const archived = list.body.items.find((n) => n.id === 1);
     const authorless = list.body.items.find((n) => n.id === 7);
-    assert.equal(archived.perm.canEdit, true);
     assert.equal(archived.perm.canDelete, false);
+    assert.equal(archived.perm.canEdit, false);
     assert.equal(authorless.perm.canDelete, false);
     assert.equal((await reader.del("/notes/1")).status, 403);
     assert.equal((await reader.del("/notes/7")).status, 403);

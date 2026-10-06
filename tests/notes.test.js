@@ -68,10 +68,7 @@ describe("notes", () => {
     assert.equal(res.status, 204);
   });
 
-  it("stops a stranger deleting someone else's post, even though they can edit it", async () => {
-    // The counterweight to open editing: rewriting is one thing, destroying a
-    // shared post is another. A stranger may hold edit rights and still get a
-    // clean 403 when they reach for delete.
+  it("stops a stranger deleting someone else's note", async () => {
     const created = await post(ada.api, "mine, thanks");
     const res = await bob.api.del(`/notes/${created.body.id}`);
     assert.equal(res.status, 403);
@@ -100,6 +97,7 @@ describe("notes", () => {
     const asBob = await bob.api.get("/notes");
     const found = asBob.body.items.find((n) => n.id === created.body.id);
     assert.equal(found.perm.canDelete, false);
+    assert.equal(found.perm.canEdit, false);
     assert.equal(found.perm.isMine, false);
   });
 
@@ -109,27 +107,13 @@ describe("notes", () => {
 
   /* ------------------------------- editing ------------------------------- */
 
-  it("lets a registered user edit someone else's public post", async () => {
-    // The Lobby is a shared collection, so a public note is community-editable:
-    // rewriting it is allowed, taking it down is not. The delete half of the old
-    // grant model deliberately did not come along.
+  it("stops a stranger editing", async () => {
     const created = await post(ada.api, "original");
-    const asBob = await bob.api.get("/notes");
-    const found = asBob.body.items.find((n) => n.id === created.body.id);
-    assert.equal(found.perm.canEdit, true, "a public post is community-editable");
-    assert.equal(found.perm.canRollback, true);
-    assert.equal(found.perm.canDelete, false, "but only the author may take it down");
-    assert.equal(found.perm.isMine, false);
-
     const res = await bob.api.put(`/notes/${created.body.id}`, {
-      title: "corrected",
-      body: "{% #ffffff %}corrected{% end %}",
+      title: "hijacked",
+      body: "hijacked",
     });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.title, "corrected");
-    assert.equal(JSON.parse(res.body.history).length, 1, "the edit is recorded");
-    // The byline still points at the original author.
-    assert.equal(res.body.author.id, ada.user.id);
+    assert.equal(res.status, 403);
   });
 
   it("lets the author edit and records a history entry", async () => {
@@ -177,17 +161,13 @@ describe("notes", () => {
     assert.equal(JSON.parse(found.history).length, 20);
   });
 
-  it("lets a stranger roll back someone else's public post", async () => {
-    // Rollback is a corrective tool and the Lobby is community-editable, so the
-    // stranger who may rewrite the note may also undo the last rewrite of it.
-    const created = await post(ada.api, "guarded", "guarded");
+  it("stops a stranger rolling back", async () => {
+    const created = await post(ada.api, "guarded");
     await ada.api.put(`/notes/${created.body.id}`, {
       title: "changed",
       body: "{% #ffffff %}changed{% end %}",
     });
-    const rolled = await bob.api.put(`/notes/${created.body.id}/rollback`);
-    assert.equal(rolled.status, 200);
-    assert.equal(rolled.body.title, "guarded");
+    assert.equal((await bob.api.put(`/notes/${created.body.id}/rollback`)).status, 403);
   });
 
   /* ------------------------------ pagination ------------------------------ */

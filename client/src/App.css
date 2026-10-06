@@ -1158,6 +1158,121 @@ button.ghost.danger:hover {
   text-decoration-thickness: 1px;
 }
 
+/* ------------------------------------------------------------------ *
+ * attributed thoughts
+ * ------------------------------------------------------------------ */
+
+/* A card with appended thoughts renders each one as its own block, chalked in
+   its writer's colour and bylined with their name. Blocks are separated by a
+   hairline so the card reads as a stack of contributions, not one blob. */
+.thought-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.thought + .thought {
+  border-top: 1px dashed var(--gray-800);
+  padding-top: 10px;
+}
+
+.thought {
+  position: relative;
+}
+
+.thought-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.thought-byline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10px;
+  color: var(--gray-600);
+  letter-spacing: 0.5px;
+}
+
+/* The pencil is the one place a thought is allowed to be corrected, so it
+   sits on the thought it belongs to and appears on hover like the card's
+   other actions. It is hidden entirely once the server's window closes. */
+.thought-edit-button {
+  background: none;
+  border: none;
+  color: var(--gray-700);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  opacity: 0;
+}
+
+.thought:hover .thought-edit-button {
+  opacity: 1;
+}
+
+.thought-edit-button:hover {
+  color: #e5c07b;
+}
+
+.thought-edit {
+  margin-top: 8px;
+}
+
+.thought-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--gray-925, var(--gray-900));
+  color: var(--white);
+  border: 1px solid var(--gray-700);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.thought-edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* The append composer at the foot of a card. It only ever adds: nothing on
+   the card is rewritable from here, which is the whole contract. */
+.append-box {
+  margin-top: 12px;
+  border-top: 1px dashed var(--gray-800);
+  padding-top: 10px;
+}
+
+.append-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--gray-925, var(--gray-900));
+  color: var(--white);
+  border: 1px solid var(--gray-700);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.append-box textarea:focus {
+  outline: none;
+  border-color: var(--gray-500);
+}
+
+.append-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
 .card-buttons-top-right {
   position: absolute;
   top: 6px;
@@ -1739,12 +1854,20 @@ button.ghost.danger:hover {
   .note-card .remove,
   .note-card .resize,
   .note-card .edit-button,
-  .note-card .rollback {
+  .note-card .rollback,
+  .thought-edit-button {
     opacity: 1;
     min-width: 34px;
     min-height: 34px;
     padding: 5px 6px;
     font-size: 14px;
+  }
+
+  /* The append composer is the primary way to join a card on a phone, so its
+     button gets the same touch target as the card actions above. */
+  .append-actions button {
+    min-height: 34px;
+    padding: 5px 10px;
   }
 
   /* The bottom bar is the mentions affordance now; two would be noise. */

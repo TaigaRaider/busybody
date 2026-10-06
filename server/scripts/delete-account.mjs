@@ -89,7 +89,7 @@ process.env.TURSO_DATABASE_URL =
 
 const { db, client } = await import("../../lib/db.js");
 const { deleteAccountData } = await import("../../lib/account-deletion.js");
-const { notes, spaceMembers, spaceRequests, users, retiredHandles } =
+const { notes, noteThoughts, spaceMembers, spaceRequests, users, retiredHandles } =
   await import("../../lib/schema.js");
 
 /**
@@ -138,12 +138,14 @@ try {
   // what they are about to lose without having to remember it afterwards.
   const summary = {
     notesKept: await count(notes, notes.authorId, user.id),
+    thoughtsKept: await count(noteThoughts, noteThoughts.authorId, user.id),
     memberships: await count(spaceMembers, spaceMembers.userId, user.id),
     requests: await count(spaceRequests, spaceRequests.userId, user.id),
   };
 
   console.log(`@${user.handle} (id ${user.id})`);
   console.log(`  notes kept, byline greyed: ${summary.notesKept}`);
+  console.log(`  thoughts kept, greyed:     ${summary.thoughtsKept}`);
   console.log(`  memberships removed:       ${summary.memberships}`);
   console.log(`  requests removed:          ${summary.requests}`);
 

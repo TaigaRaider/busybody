@@ -16,6 +16,9 @@
  *   - notes gains author_handle  -> the byline a note keeps after its author
  *                                   deletes their account
  *   - new: retired_handles       -> deleted accounts' handles, unclaimable
+ *   - new: note_thoughts         -> every card's attributed thoughts; the
+ *                                   author's opening is backfilled from the
+ *                                   note's own fields
  *
  * Legacy notes keep an "archived author" placeholder user keyed off the old
  * uuid prefix. Because those users have no known credential, only an admin can
@@ -23,6 +26,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { createClient } from "@libsql/client";
+import { stripMarkup } from "../../lib/richtext.js";
 
 const BOOTSTRAP = [
   `CREATE TABLE IF NOT EXISTS users (
@@ -112,6 +116,21 @@ const BOOTSTRAP = [
      PRIMARY KEY (note_id, user_id)
    )`,
   `CREATE INDEX IF NOT EXISTS note_layouts_user_idx ON note_layouts(user_id)`,
+
+  // Every card's attributed thoughts: the author's opening plus appends by
+  // others. The first row of each note is backfilled by `ensureThoughts`; the
+  // note's body is the derived concatenation.
+  `CREATE TABLE IF NOT EXISTS note_thoughts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+     author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     author_handle TEXT NOT NULL,
+     color TEXT NOT NULL,
+     text TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS note_thoughts_note_idx ON note_thoughts(note_id, id)`,
 ];
 
 async function tableExists(client, name) {
@@ -293,6 +312,46 @@ async function ensureNoteIndexes(client) {
   );
 }
 
+/**
+ * Backfills the opening thought for every note that predates `note_thoughts`.
+ *
+ * Idempotent: notes that already have a thought row are left alone. The
+ * opening thought is the note author's, so the row mirrors the note's own
+ * snapshot fields, and its text is the body with colour markup stripped —
+ * `notes.body` is the derived concatenation and stays as it was stored.
+ */
+async function ensureThoughts(client, log) {
+  const withThought = await client.execute(
+    "SELECT note_id FROM note_thoughts GROUP BY note_id",
+  );
+  const done = new Set(withThought.rows.map((r) => r.note_id));
+  const rows = await client.execute(`
+    SELECT id, author_id, author_handle, author_color, body, created_at, updated_at
+    FROM notes
+  `);
+
+  let added = 0;
+  for (const n of rows.rows) {
+    if (done.has(n.id)) continue;
+    await client.execute(
+      `INSERT INTO note_thoughts
+         (note_id, author_id, author_handle, color, text, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        n.id,
+        n.author_id,
+        n.author_handle || "",
+        n.author_color || "#8899aa",
+        stripMarkup(n.body || ""),
+        n.created_at,
+        n.updated_at,
+      ],
+    );
+    added += 1;
+  }
+  log(added ? `backfilled ${added} opening thoughts` : "opening thoughts already present");
+}
+
 export async function migrate({ log = () => {} } = {}) {
   const url = process.env.TURSO_DATABASE_URL || "file:local.db";
   const client = createClient({
@@ -308,6 +367,7 @@ export async function migrate({ log = () => {} } = {}) {
     await ensureGhostColumn(client, log);
     await ensureAuthorHandleColumn(client, log);
     await ensureNoteIndexes(client);
+    await ensureThoughts(client, log);
     log("migration complete");
   } finally {
     client.close();

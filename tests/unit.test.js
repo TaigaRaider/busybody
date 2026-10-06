@@ -279,6 +279,7 @@ describe("permissions", () => {
     // Every write does not.
     for (const action of [
       "create_note",
+      "append_note",
       "edit_own",
       "delete_own",
       "edit_any",
