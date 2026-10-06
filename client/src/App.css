@@ -1709,16 +1709,20 @@ button.ghost.danger:hover {
     gap: 10px;
   }
 
-  /* Reset the two-column spans from the tablet block, or they would ask a
-     single-column grid for columns that do not exist. */
-  .note-card.wide,
-  .note-card.big {
+  /* Width no longer distinguishes wide/big from their siblings on a single
+     column, so height does: tall and big keep a two-row span while the rows
+     hold their 118px floor, which reads as a distinctly taller card instead of
+     collapsing flat. Without this the ◇ resize button cycled sizes that were
+     all indistinguishable — an affordance that visibly did nothing. */
+  .note-card.small,
+  .note-card.wide {
     grid-column: span 1;
     grid-row: span 1;
   }
 
-  .note-card.tall {
-    grid-row: span 1;
+  .note-card.tall,
+  .note-card.big {
+    grid-row: span 2;
   }
 
   .note-chalk {

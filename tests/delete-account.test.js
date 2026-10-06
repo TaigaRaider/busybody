@@ -201,9 +201,13 @@ describe("deleting an account", () => {
     assert.equal(found.authorHandle, null);
   });
 
-  it("leaves nobody able to edit or delete what they wrote", async () => {
+  it("lets the community edit but not delete what a departed author wrote", async () => {
+    // Rewriting follows the Lobby's open-editing rule, so a live account may
+    // correct the note and the grey byline stays. Deletion was the power that
+    // died with the account: the rule that only the author can take a post
+    // down has nobody left to satisfy, and nobody else may claim it.
     const stayerEdit = await stayer.api.put(`/notes/${theirNote.id}`, { body: "edited" });
-    assert.equal(stayerEdit.status, 403);
+    assert.equal(stayerEdit.status, 200);
     const stayerDelete = await stayer.api.del(`/notes/${theirNote.id}`);
     assert.equal(stayerDelete.status, 403);
   });
