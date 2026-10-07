@@ -14,11 +14,21 @@
  * The password is read from the environment rather than an argument so it does
  * not end up in shell history.
  *
- * The account's token is rotated at the same time and deliberately NOT printed.
- * Anyone using this script is doing so because they cannot sign in, which very
- * often means the session is in a state they do not trust — leaving the old
- * token alive would defeat the point. The new token is discarded; the account
- * signs in with the password and gets a fresh one.
+ * Admin is not auto-bootstrapped anymore: only the ADMIN_HANDLE handle
+ * (default `tatati`) may act as admin, and only while its row says is_admin=1.
+ * Grant or revoke that marker here:
+ *
+ *   TABLOID_NEW_PASSWORD='...' node server/scripts/set-password.mjs tatati --grant-admin
+ *   node server/scripts/set-password.mjs tatati --revoke-admin
+ *
+ * With --grant-admin the token is NOT rotated (no password is being set), so a
+ * holder who is already signed in keeps their session.
+ *
+ * The account's token is rotated at the same time as a password change and
+ * deliberately NOT printed. Anyone using this script is doing so because they
+ * cannot sign in, which very often means the session is in a state they do not
+ * trust — leaving the old token alive would defeat the point. The new token is
+ * discarded; the account signs in with the password and gets a fresh one.
  */
 import { readFileSync } from "node:fs";
 import { createClient } from "@libsql/client";
@@ -44,13 +54,23 @@ if (envFileIndex !== -1) {
 
 const handle = String(argv[0] || "").trim().toLowerCase();
 const password = process.env.TABLOID_NEW_PASSWORD;
+const grantAdmin = argv.includes("--grant-admin");
+const revokeAdmin = argv.includes("--revoke-admin");
+const changingPassword = !grantAdmin && !revokeAdmin;
 
 if (!handle || !/^[a-z0-9][a-z0-9._-]{1,30}$/.test(handle)) {
-  console.error("usage: TABLOID_NEW_PASSWORD='...' node server/scripts/set-password.mjs <handle> [--env <file>]");
+  console.error(
+    "usage: TABLOID_NEW_PASSWORD='...' node server/scripts/set-password.mjs <handle> [--env <file>] [--grant-admin | --revoke-admin]",
+  );
   process.exit(1);
 }
 
-if (!isAcceptablePassword(password)) {
+if (grantAdmin && revokeAdmin) {
+  console.error("--grant-admin and --revoke-admin are mutually exclusive");
+  process.exit(1);
+}
+
+if (changingPassword && !isAcceptablePassword(password)) {
   // Never echo the value, only the requirement.
   console.error(
     `TABLOID_NEW_PASSWORD must be a string of ${PASSWORD_MIN}-${PASSWORD_MAX} characters`,
@@ -75,6 +95,20 @@ try {
   }
 
   const user = found.rows[0];
+
+if (grantAdmin || revokeAdmin) {
+  const granting = grantAdmin ? 1 : 0;
+  await db.execute({
+    sql: "update users set is_admin = ? where id = ?",
+    args: [granting, user.id],
+  });
+  console.log(
+    `${grantAdmin ? "granted" : "revoked"} admin on @${user.handle}` +
+      (grantAdmin
+        ? " — make sure ADMIN_HANDLE (default: tatati) names this account, or the role stays dormant."
+        : ""),
+  );
+} else {
   // The token is thrown away on purpose. See the note at the top of the file.
   const replacement = generateToken();
 
@@ -85,6 +119,7 @@ try {
 
   console.log(`password set for @${user.handle} (admin: ${user.is_admin ? "yes" : "no"})`);
   console.log("their existing token has been revoked and discarded - sign in with the password");
+}
 } finally {
   db.close();
 }

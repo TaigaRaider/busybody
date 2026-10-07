@@ -18,7 +18,7 @@ let notes;
  */
 describe("deleting an account", () => {
   let server;
-  let founder; // the first account, so the admin — never leaves until the end
+  let founder; // the designated, operator-granted admin — never leaves until the end
   let leaver; // deletes their own account
   let stayer; // proves the board keeps working
   let room; // a space the leaver is a member of, not the owner of
@@ -27,7 +27,7 @@ describe("deleting an account", () => {
   let theirColor;
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "founder" });
     ({ db: leaverDb } = await import("../lib/db.js"));
     ({ notes } = await import("../lib/schema.js"));
 
@@ -38,9 +38,12 @@ describe("deleting an account", () => {
       return { handle, api, user: res.body.user, password: TEST_PASSWORD };
     };
 
-    // Registered first, so it bootstraps as the admin. Every other account here
-    // is ordinary, which is what lets `leaver` go without stranding the board.
+    // `founder` is the designated ADMIN_HANDLE for this file's board, and an
+    // operator-style grant (the is_admin=1 marker) makes it the admin. Every
+    // other account here is ordinary, which is what lets `leaver` go without
+    // stranding the board.
     founder = await make("founder", PALETTE[4]);
+    await server.grantAdmin("founder");
     leaver = await make("leaver", PALETTE[0]);
     stayer = await make("stayer", PALETTE[1]);
     theirColor = leaver.user.color;
@@ -244,7 +247,8 @@ describe("deleting an account", () => {
     // in this database has by now deleted itself. There is no endpoint that
     // grants admin, so a board with none can never be given one again — this is
     // the one guard that is about the site's survival rather than the person's.
-    assert.equal(founder.user.isAdmin, true, "the founder bootstrapped as admin");
+    const me = await founder.api.get("/auth/me");
+    assert.equal(me.body.user.isAdmin, true, "founder is the designated, granted admin");
 
     const res = await founder.api.del("/auth/me", { password: TEST_PASSWORD });
     assert.equal(res.status, 409, JSON.stringify(res.body));
@@ -261,14 +265,17 @@ describe("deleting an account", () => {
     assert.equal(heir.status, 201);
     assert.equal(heir.body.user.isAdmin, false, "nobody can just appoint a second admin");
 
-    // Promote out of band, which is exactly the lever the app does not expose.
+    // Hand over out of band, which is exactly the lever the app does not
+    // expose: promote `heir` and make it the designated handle. (The env is
+    // read per request, so flipping it mid-test is exactly what an operator
+    // doing a handover would deploy.)
     const { users } = await import("../lib/schema.js");
     const { eq } = await import("drizzle-orm");
-    await leaverDb
-      .update(users)
-      .set({ isAdmin: 1 })
-      .where(eq(users.handle, "heir"));
+    await leaverDb.update(users).set({ isAdmin: 1 }).where(eq(users.handle, "heir"));
+    process.env.ADMIN_HANDLE = "heir";
 
+    // `founder` is no longer the effective admin, so the last-admin guard no
+    // longer applies to its departure.
     const res = await founder.api.del("/auth/me", { password: TEST_PASSWORD });
     assert.equal(res.status, 204, JSON.stringify(res.body));
   });

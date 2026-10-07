@@ -25,7 +25,7 @@ describe("the delete-account operator script", () => {
   let bystander; // ordinary account, must survive untouched
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "op-founder" });
     // `boot()` points TURSO_DATABASE_URL at a throwaway file and leaves the env
     // var set, so the script can be pointed at exactly the same database. Its
     // own connection is separate, as a separate process would be.
@@ -36,6 +36,9 @@ describe("the delete-account operator script", () => {
       (await founder.register("op-founder", PALETTE[4], TEST_PASSWORD)).status,
       201,
     );
+    // The designated handle plus an operator-style grant: exactly how the real
+    // board's admin comes to exist now that registration never promotes.
+    await server.grantAdmin("op-founder");
     bystander = clientFor(server.base);
     assert.equal(
       (await bystander.register("op-bystander", PALETTE[5], TEST_PASSWORD)).status,
@@ -120,9 +123,10 @@ describe("the delete-account operator script", () => {
   });
 
   it("refuses a last admin, exactly as the route does", async () => {
-    // `op-founder` is the first account in this database, so it bootstrapped as
-    // the admin. The script must not become a way to lose the board's only
-    // admin, which is why this is guarded rather than sitting behind a flag.
+    // `op-founder` is both the designated ADMIN_HANDLE for this database and
+    // carries the is_admin=1 grant, so it is the board's only admin. The
+    // script must not become a way to lose the board's only admin, which is
+    // why this is guarded rather than sitting behind a flag.
     await assert.rejects(() => script("op-founder"), /refused:.*only admin.*\(LAST_ADMIN\)/s);
 
     const me = await clientFor(server.base).login("op-founder", TEST_PASSWORD);

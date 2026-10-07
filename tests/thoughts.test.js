@@ -13,7 +13,7 @@ import { boot, clientFor, makeUsers, PALETTE, TEST_PASSWORD } from "./helpers.js
  */
 describe("attributed thoughts", () => {
   let server;
-  let owner; // first account, so the admin
+  let owner; // user0 — a plain account that owns the rooms below
   let ada; // writes the opening thought
   let bob; // appends to ada's cards
   let carol; // appends too

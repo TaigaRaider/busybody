@@ -18,11 +18,14 @@ describe("password auth", () => {
   let alice;
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "alice" });
 
     alice = clientFor(server.base);
     const created = await alice.register("alice", PALETTE[0], PASSWORD);
     assert.equal(created.status, 201);
+    // Admin comes from an operator grant paired with the designated handle, not
+    // from being first. `alice` is the ADMIN_HANDLE for this file's board.
+    await server.grantAdmin("alice");
   });
 
   after(async () => {

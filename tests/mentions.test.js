@@ -10,9 +10,12 @@ describe("mentions", () => {
   let admin;
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "user0" });
     [ada, bob, carol] = await makeUsers(server.base, 3);
-    admin = ada; // first registered account is an admin
+    // `user0` is the designated ADMIN_HANDLE for this file's board; the grant
+    // is what makes it the admin (registration never promotes).
+    await server.grantAdmin("user0");
+    admin = ada;
   });
   after(async () => {
     await server.close();
@@ -234,7 +237,9 @@ describe("mentions", () => {
     assert.equal(new Set(seen.map((i) => i.note.id)).size, 5);
   });
 
-  it("keeps the admin's own access intact", () => {
-    assert.ok(admin.user.isAdmin);
+  it("keeps the admin's own access intact", async () => {
+    const me = await admin.api.get("/auth/me");
+    assert.equal(me.status, 200);
+    assert.ok(me.body.user.isAdmin, "the granted designated handle stays admin");
   });
 });

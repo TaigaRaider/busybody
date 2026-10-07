@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { boot, clientFor, PALETTE } from "./helpers.js";
+import { boot, clientFor, PALETTE, TEST_PASSWORD } from "./helpers.js";
 
 describe("auth", () => {
   let server;
   let api;
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "ada" });
     api = clientFor(server.base);
   });
   after(async () => {
@@ -22,15 +22,37 @@ describe("auth", () => {
     assert.ok(res.body.token.length > 20);
     // The raw token must never be echoed back inside the user record.
     assert.equal(res.body.user.tokenHash, undefined);
-    // The very first account bootstraps an admin so a fresh install is
-    // manageable.
-    assert.equal(res.body.user.isAdmin, true);
+    // Registration never bootstraps an admin: the role belongs to the
+    // designated ADMIN_HANDLE (ada, for this file's board) once an operator
+    // grants it, so a brand-new account is always ordinary.
+    assert.equal(res.body.user.isAdmin, false);
   });
 
   it("does not make later accounts admins", async () => {
     const res = await clientFor(server.base).register("zoe", PALETTE[1]);
     assert.equal(res.status, 201);
     assert.equal(res.body.user.isAdmin, false);
+  });
+
+  it("only the designated handle can act as admin, and only with an operator grant", async () => {
+    // `api` holds ada's token, and ada is the ADMIN_HANDLE for this file's
+    // board — yet without the operator's is_admin=1 grant, ada is ordinary.
+    const before = await api.get("/auth/me");
+    assert.equal(before.body.user.isAdmin, false, "a fresh account is never promoted");
+
+    await server.grantAdmin("ada");
+    const promoted = await api.get("/auth/me");
+    assert.equal(
+      promoted.body.user.isAdmin,
+      true,
+      "designated handle + operator grant = the admin",
+    );
+
+    // A granted row under a different handle has no authority at all.
+    await server.grantAdmin("zoe");
+    const zoe = await clientFor(server.base).login("zoe", TEST_PASSWORD);
+    assert.equal(zoe.status, 200);
+    assert.equal(zoe.body.user.isAdmin, false, "wrong handle, no authority");
   });
 
   it("lowercases the handle and colour", async () => {

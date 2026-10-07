@@ -46,8 +46,16 @@ lib/
 |-----|-------|-------|
 | `TURSO_DATABASE_URL` | `libsql://tabloid-taigaraider.aws-us-east-2.turso.io` | |
 | `TURSO_AUTH_TOKEN` | Read-write token (see below) | |
-| `CORS_ORIGIN` | `https://thetabloid.vercel.app` | |
+| `CORS_ORIGIN` | `https://thetabloid.vercel.app` | Comma-separated list supported. |
 | `ADMIN_TOKEN` | *(optional)* | A superuser credential for operational access. Set it, then `Authorization: Bearer <ADMIN_TOKEN>`. **Not** required for normal use. |
+| `ADMIN_HANDLE` | `tatati` | The only account that can act as admin — and only while its row carries `is_admin = 1`. Grant that marker with `server/scripts/set-password.mjs tatati --grant-admin`. Registration never promotes. |
+| `RATE_LIMIT_LOGIN` | `10` | Sign-in attempts per ip+handle per 15 min. |
+| `RATE_LIMIT_REGISTER` | `10` | Registrations per IP per 15 min. |
+| `RATE_LIMIT_NOTES` | `30` | Note creations per user per 15 min. |
+| `RATE_LIMIT_THOUGHTS` | `60` | Thoughts appended per user per 15 min. |
+| `RATE_LIMIT_SPACES` | `5` | Spaces created per user per 15 min. |
+| `RATE_LIMIT_COLOR` | `10` | Chalk re-paints per user per 15 min. |
+| `RATE_LIMIT_WINDOW_MS` | *(optional)* | Throttle window override (tests use a short one). |
 
 ### Frontend (busybody)
 | Key | Value |
@@ -65,7 +73,7 @@ Individual pieces:
 npm run migrate    # apply/upgrade the schema
 npm run dev:api    # API only
 npm run dev:client # Vite only
-npm test           # 128 tests, node:test, no extra dependencies
+npm test           # full node:test suite (server + scripts), no extra dependencies
 ```
 
 ## Database Migrations

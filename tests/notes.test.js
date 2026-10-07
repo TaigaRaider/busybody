@@ -4,14 +4,15 @@ import { boot, clientFor, makeUsers, PALETTE } from "./helpers.js";
 
 describe("notes", () => {
   let server;
-  let owner; // first account => isAdmin, used for the admin-deletion case
+  let owner; // user0 — the file's designated admin handle, used for the admin-deletion case
   let ada;
   let bob;
   let admin;
 
   before(async () => {
-    server = await boot();
+    server = await boot({ adminHandle: "user0" });
     [owner, ada, bob] = await makeUsers(server.base, 3);
+    await server.grantAdmin("user0");
     admin = clientFor(server.base, "test-admin-token");
   });
   after(async () => {

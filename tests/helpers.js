@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
+import { eq } from "drizzle-orm";
+import { users as usersTable } from "../lib/schema.js";
 
 /**
  * Boots the real API against a throwaway SQLite file on an ephemeral port.
@@ -10,7 +12,7 @@ import { once } from "node:events";
  * own module registry and therefore its own database — the env vars below are
  * read by `lib/db.js` and `server/scripts/migrate.mjs` on first import.
  */
-export async function boot() {
+export async function boot({ adminHandle } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "tabloid-test-"));
 
   process.env.TURSO_DATABASE_URL = `file:${join(dir, "test.db")}`;
@@ -36,6 +38,13 @@ export async function boot() {
   const { migrate } = await import("../server/scripts/migrate.mjs");
   await migrate();
 
+  // The designated admin handle for this file's board. Registration no longer
+  // bootstraps anything: `grantAdmin` below must pair with the handle the test
+  // promotes, so the effective-admin rule (handle match AND is_admin = 1) is
+  // the real gate every admin assertion exercises.
+  process.env.ADMIN_HANDLE =
+    adminHandle ?? process.env.ADMIN_HANDLE ?? "tatati";
+
   const dbModule = await import("../lib/db.js");
   const { createApp } = await import("../lib/app.js");
   const server = createApp().listen(0);
@@ -53,6 +62,17 @@ export async function boot() {
 
   return {
     base,
+    /**
+     * Promotes an account to admin the way an operator would: the designated
+     * ADMIN_HANDLE env (+ the is_admin=1 marker this sets) together de-ghost
+     * the role. Registration alone never grants it.
+     */
+    async grantAdmin(handle) {
+      await dbModule.db
+        .update(usersTable)
+        .set({ isAdmin: 1 })
+        .where(eq(usersTable.handle, handle));
+    },
     async close() {
       await new Promise((resolve) => server.close(resolve));
       // Release the sqlite handle before deleting the file, otherwise Windows
