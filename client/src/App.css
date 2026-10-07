@@ -57,7 +57,7 @@
   margin-bottom: 20px;
   padding: 14px 16px;
   border: 1px dashed var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: rgba(231, 233, 234, 0.04);
   color: var(--text-2);
   font-size: 13px;
@@ -73,7 +73,7 @@
   flex: 0 0 auto;
   min-height: 36px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--white);
   color: var(--black);
   font-size: 14px;
@@ -92,7 +92,7 @@
   margin-bottom: 2px;
   padding: 12px 14px;
   border: 1px dashed var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--surface);
 }
 
@@ -114,7 +114,7 @@
   align-self: flex-start;
   min-height: 36px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--white);
   color: var(--black);
   font-size: 14px;
@@ -191,7 +191,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--surface);
   color: var(--text-1);
   font-size: 16px;
@@ -221,7 +221,7 @@
   gap: 10px;
   padding: 9px 12px;
   border: none;
-  border-radius: 999px;
+  border-radius: 0;
   background: none;
   color: var(--text-2);
   font-size: 15px;
@@ -308,7 +308,7 @@
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--surface);
 }
 
@@ -316,7 +316,7 @@
 .space-create select {
   padding: 9px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text-1);
   font-size: 14px;
@@ -337,7 +337,7 @@
   gap: 8px;
   padding: 10px 14px;
   border: 1px dashed var(--border-strong);
-  border-radius: 999px;
+  border-radius: 0;
   color: var(--text-2);
   font-size: 14px;
   font-weight: 600;
@@ -369,7 +369,7 @@
   align-items: center;
   gap: 8px;
   padding: 9px 12px;
-  border-radius: 999px;
+  border-radius: 0;
   color: var(--text-2);
   font-size: 15px;
   font-weight: 500;
@@ -409,7 +409,7 @@
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--surface);
 }
 
@@ -426,7 +426,7 @@
   color: var(--text-1);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 8px 10px;
   word-break: break-all;
   user-select: all;
@@ -446,7 +446,7 @@
   min-height: 28px;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: 0;
   background: none;
   color: var(--text-1);
   font-size: 12px;
@@ -475,7 +475,7 @@
   margin-top: 10px;
   padding: 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--elevated);
 }
 
@@ -528,7 +528,7 @@
   align-items: center;
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-2);
@@ -586,7 +586,7 @@
   width: 100%;
   max-width: 380px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--surface);
   padding: 36px 28px;
 }
@@ -622,7 +622,7 @@
   margin-bottom: 22px;
   padding: 3px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--bg);
 }
 
@@ -630,7 +630,7 @@
   flex: 1;
   min-height: 36px;
   border: none;
-  border-radius: 999px;
+  border-radius: 0;
   background: none;
   color: var(--text-2);
   font-size: 14px;
@@ -654,7 +654,7 @@
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text-1);
   font-size: 14px;
@@ -707,7 +707,7 @@
   width: 100%;
   min-height: 44px;
   border: none;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--white);
   color: var(--black);
   font-size: 15px;
@@ -739,7 +739,7 @@
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -808,7 +808,7 @@
   margin-bottom: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0;
   color: var(--text-2);
   font-size: 15px;
   font-weight: 600;
@@ -849,7 +849,7 @@
   min-height: 36px;
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--white);
   color: var(--black);
   font-size: 14px;
@@ -933,7 +933,7 @@ button.ghost.danger:hover:not(:disabled) {
   padding: 6px;
   list-style: none;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--elevated);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   max-height: 220px;
@@ -947,7 +947,7 @@ button.ghost.danger:hover:not(:disabled) {
   gap: 8px;
   padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   background: none;
   color: var(--text-1);
   font-size: 14px;
@@ -968,7 +968,7 @@ button.ghost.danger:hover:not(:disabled) {
   padding: 14px;
   margin-bottom: 4px;
   border: 1px dashed var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--bg);
 }
 
@@ -997,7 +997,7 @@ button.ghost.danger:hover:not(:disabled) {
 .member-add-row select {
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--surface);
   color: var(--text-1);
   font-size: 14px;
@@ -1024,7 +1024,7 @@ button.ghost.danger:hover:not(:disabled) {
 .space-settings {
   margin-top: 12px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--surface);
   overflow: hidden;
 }
@@ -1049,7 +1049,7 @@ button.ghost.danger:hover:not(:disabled) {
   bottom: -1px;
   height: 3px;
   background: var(--accent);
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
 }
 
 .settings-facts {
@@ -1080,7 +1080,7 @@ button.ghost.danger:hover:not(:disabled) {
 .discover-search {
   padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text-1);
   font-family: var(--sans);
@@ -1105,7 +1105,7 @@ button.ghost.danger:hover:not(:disabled) {
   padding: 2px 16px;
   background: #202327;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1187,7 +1187,7 @@ button.ghost.danger:hover:not(:disabled) {
 .note-card {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--surface);
   text-align: left;
   transition: border-color 0.15s ease;
@@ -1222,7 +1222,7 @@ button.ghost.danger:hover:not(:disabled) {
 .note-chalk {
   padding: 14px 16px;
   border-left: 3px solid var(--gray-600);
-  border-radius: 16px;
+  border-radius: 0;
   height: 100%;
 }
 
@@ -1358,7 +1358,7 @@ button.ghost.danger:hover:not(:disabled) {
   background: var(--bg);
   color: var(--text-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 8px 10px;
   font: inherit;
   font-size: 14px;
@@ -1397,7 +1397,7 @@ button.ghost.danger:hover:not(:disabled) {
   min-height: 32px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: 0;
   background: none;
   color: var(--text-1);
   font-size: 13px;
@@ -1583,7 +1583,7 @@ button.ghost.danger:hover:not(:disabled) {
   margin: 0 0 16px;
   padding: 14px 16px;
   border: 1px dashed var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   color: var(--text-2);
   font-size: 13px;
   line-height: 1.6;
@@ -1612,7 +1612,7 @@ button.ghost.danger:hover:not(:disabled) {
   min-height: 40px;
   padding: 0 30px;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: 0;
   background: none;
   color: var(--text-1);
   font-size: 14px;
@@ -1658,7 +1658,7 @@ button.ghost.danger:hover:not(:disabled) {
 
 .access-panel {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--surface);
   padding: 24px;
   max-width: 520px;
@@ -1686,7 +1686,7 @@ button.ghost.danger:hover:not(:disabled) {
 
 .access-form fieldset {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 14px;
   margin: 0;
 }
@@ -1728,7 +1728,7 @@ button.ghost.danger:hover:not(:disabled) {
 .access-form textarea {
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text-1);
   font-size: 14px;
@@ -1767,7 +1767,7 @@ button.ghost.danger:hover:not(:disabled) {
 .moderation {
   margin-top: 28px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--surface);
   overflow: hidden;
 }
@@ -1808,7 +1808,7 @@ button.ghost.danger:hover:not(:disabled) {
   bottom: -1px;
   height: 3px;
   background: var(--accent);
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
 }
 
 .mod-body {
@@ -1825,7 +1825,7 @@ button.ghost.danger:hover:not(:disabled) {
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--bg);
   flex-wrap: wrap;
 }
@@ -1862,7 +1862,7 @@ button.ghost.danger:hover:not(:disabled) {
   margin-left: auto;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text-1);
   font-size: 14px;
@@ -1907,7 +1907,7 @@ button.ghost.danger:hover:not(:disabled) {
   color: var(--text-1);
   padding: 10px 18px;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   font-size: 14px;
   z-index: 1000;
@@ -2012,6 +2012,7 @@ button.ghost.danger:hover:not(:disabled) {
   padding: 0 4px;
   display: grid;
   place-items: center;
+  /* The count bubble stays round — it is a dot, not a corner. */
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
