@@ -272,10 +272,13 @@ The client builds with `vite-plugin-pwa`: the service worker and web manifest
 are emitted into `dist/` alongside the static assets.
 
 - **Offline app shell.** The Workbox service worker precaches the static shell
-  only — `index.html`, the content-hashed JS/CSS bundles, `favicon.svg`, the
-  icon set and the manifest. The app opens instantly from cache and loads
-  offline; there is no stale-shell prompt because new deployments take over on
-  the next load (`registerType: "autoUpdate"`).
+  only — `/` (the SPA entry), the content-hashed JS/CSS bundles, `favicon.svg`,
+  the icon set and the manifest. Vercel serves the SPA at `/` and 404s
+  `/index.html`, so the precache entry is remapped from `index.html` to `/`
+  (`manifestTransforms`) with `navigateFallback: "/"` — without that remap the
+  service worker fails to install on this host. The app opens instantly from
+  cache and loads offline; there is no stale-shell prompt because new
+  deployments take over on the next load (`registerType: "autoUpdate"`).
 - **The API is deliberately never cached.** It is a different origin serving
   per-user, live data. A service-worker cache could show a stale board and leak
   one signed-in account's notes to the next reader on a shared browser, so

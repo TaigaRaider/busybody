@@ -44,8 +44,19 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
+        // Vercel serves the SPA at `/`, not at `/index.html` (which 404s), and
+        // Workbox precaches the Vite shell under `index.html`. Remap that entry
+        // to `/` so the precache fetch succeeds and the offline shell is the
+        // URL the host actually serves.
+        manifestTransforms: [
+          (originalManifest) => ({
+            manifest: originalManifest.map((entry) =>
+              entry.url === "index.html" ? { ...entry, url: "/" } : entry,
+            ),
+          }),
+        ],
         // The SPA has no routes; offline navigation lands on the shell.
-        navigateFallback: "/index.html",
+        navigateFallback: "/",
         // Deliberately no runtimeCaching: the API is a different origin that
         // serves per-user, live data. Caching it would show stale boards and
         // could leak one signed-in account's notes to the next on a shared
