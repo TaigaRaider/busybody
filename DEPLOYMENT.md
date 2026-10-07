@@ -266,6 +266,30 @@ read from the environment so it does not land in shell history.
 - URL: `libsql://tabloid-taigaraider.aws-us-east-2.turso.io`
 - Token: `eyJxxx...`
 
+## PWA (Progressive Web App)
+
+The client builds with `vite-plugin-pwa`: the service worker and web manifest
+are emitted into `dist/` alongside the static assets.
+
+- **Offline app shell.** The Workbox service worker precaches the static shell
+  only — `index.html`, the content-hashed JS/CSS bundles, `favicon.svg`, the
+  icon set and the manifest. The app opens instantly from cache and loads
+  offline; there is no stale-shell prompt because new deployments take over on
+  the next load (`registerType: "autoUpdate"`).
+- **The API is deliberately never cached.** It is a different origin serving
+  per-user, live data. A service-worker cache could show a stale board and leak
+  one signed-in account's notes to the next reader on a shared browser, so
+  everything non-precached is network-only passthrough. There is intentionally
+  no offline data mode: the Tabloid is a live multi-user board, and offline you
+  get the shell and the auth screen, not stale notes.
+- **Icons.** `client/public/icons/*.png` (192, 512, maskable-512, and a 180
+  apple-touch icon — a chalk-red diamond on slate, matching the favicon) are
+  committed, and reproducible with `node scripts/generate-pwa-icons.mjs`, a
+  dependency-free generator with a hand-rolled PNG encoder.
+- **Entry point.** `index.html` carries the description, `theme-color`
+  `#111111`, and the apple-touch icon; the plugin injects the manifest `<link>`
+  and the `registerSW.js` script at build time.
+
 ## Key Files
 
 ### `vercel.json` — Vercel config
@@ -372,6 +396,10 @@ outside the Vercel root directory.
 - Switched DB from `better-sqlite3` to `@libsql/client` (Turso)
 - 2026-07-29: Replaced 12-color palette grid with native color wheel (`<input type="color">`). Added `GET /colors` endpoint for uniqueness enforcement. Color is claimed per-authorId — shown as "already claimed" if taken by another user. Clicking the color dot reopens the picker; old colors are freed automatically when no notes reference them with that authorId.
 - 2026-07-30: Removed admin key password field. Replaced with unified search bar that filters notes live by title/body. Admin auth via sentinel prefix `!{adminKey}` — typing `!{key}` in the search bar triggers authentication, shows admin badge next to input. Any other text filters notes in real-time, stripping color markers for clean matching.
+- 2026-10-07: The frontend became a PWA — `vite-plugin-pwa` emits a web
+  manifest and a Workbox service worker that precaches the static app shell
+  (installable, opens instantly from cache, loads offline). API responses are
+  deliberately never cached. Generated icons in `client/public/icons/`.
 - 2026-10-03: Accounts, mentions, spaces and real authorization landed together:
   - Shared `lib/` extracted; `api/index.js` and `server/src/index.js` became thin wrappers over `createApp()` (they had drifted apart). Root deps aligned to express 5 / drizzle 1.0-rc to remove the version skew.
   - Real bearer-token auth replaced the spoofable `authorId`-as-token scheme.
