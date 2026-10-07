@@ -814,7 +814,7 @@ export default function App() {
             />
             {space && (
               <Moderation
-                key={space.id}
+                key={`mod-${space.id}`}
                 space={space}
                 caps={space.caps}
                 onChanged={refreshSpaces}
@@ -823,7 +823,7 @@ export default function App() {
             )}
             {space && (
               <SpaceSettings
-                key={space.id}
+                key={`settings-${space.id}`}
                 space={space}
                 caps={space.caps}
                 onChanged={refreshSpaces}
