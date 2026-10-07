@@ -146,6 +146,14 @@ const BOOTSTRAP = [
      PRIMARY KEY (note_id, user_id)
    )`,
   `CREATE INDEX IF NOT EXISTS note_deletion_votes_note_idx ON note_deletion_votes(note_id)`,
+
+  // Shared throttles, so one serverless instance's budget is everyone's. A row
+  // is (key, window_start, count) for a fixed window; see lib/schema.js.
+  `CREATE TABLE IF NOT EXISTS rate_limits (
+     key TEXT PRIMARY KEY,
+     window_start INTEGER NOT NULL,
+     count INTEGER NOT NULL
+   )`,
 ];
 
 async function tableExists(client, name) {

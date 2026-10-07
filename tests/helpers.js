@@ -18,6 +18,21 @@ export async function boot() {
   process.env.ADMIN_TOKEN = "test-admin-token";
   process.env.CORS_ORIGIN = "*";
 
+  // Generous budgets so the shared suite never trips the throttles it is not
+  // about. Each test file runs in its own process against its own database, so
+  // a file can opt into real limits (rate-limit.test.js) by setting them here,
+  // before `boot()` — `??=` only fills unset keys. The login budget is the one
+  // the suite already exercises, so it keeps its production default of 10.
+  for (const [name, value] of [
+    ["RATE_LIMIT_REGISTER", "1000"],
+    ["RATE_LIMIT_NOTES", "1000"],
+    ["RATE_LIMIT_THOUGHTS", "1000"],
+    ["RATE_LIMIT_SPACES", "1000"],
+    ["RATE_LIMIT_COLOR", "1000"],
+  ]) {
+    process.env[name] ??= value;
+  }
+
   const { migrate } = await import("../server/scripts/migrate.mjs");
   await migrate();
 
