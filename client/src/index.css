@@ -12,8 +12,8 @@
   --bg: #000000;
   --surface: #16181c; /* cards, panels */
   --elevated: #1d1f23; /* menus, popovers, hover rows */
-  --border: #2f3336; /* hairlines, card borders */
-  --border-strong: #536471; /* emphasiseable borders */
+  --border: #26292b; /* hairlines, card borders — kept dim so boxes stay quiet */
+  --border-strong: #3a4148; /* emphasiseable borders — dimmer than before */
   --text-1: #e7e9ea; /* primary text */
   --text-2: #71767b; /* secondary: timestamps, bylines, hints */
   --text-3: #536471; /* faint: background copy, placeholders */

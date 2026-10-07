@@ -1230,7 +1230,9 @@ button.ghost.danger:hover:not(:disabled) {
   font-size: 15px;
   font-weight: 700;
   margin: 0 0 6px;
-  padding-right: 80px;
+  /* 132px clears the widest corner-action cluster (4 x 28px + gaps + right
+     inset) so the hover-revealed buttons never sit on top of the title. */
+  padding-right: 132px;
   color: var(--text-1);
   line-height: 1.3;
   word-break: break-word;
@@ -1239,7 +1241,7 @@ button.ghost.danger:hover:not(:disabled) {
 .body-colored {
   white-space: pre-wrap;
   word-break: break-word;
-  padding-right: 80px;
+  padding-right: 132px;
   line-height: 1.5;
   font-size: 14px;
 }
@@ -1444,10 +1446,13 @@ button.ghost.danger:hover:not(:disabled) {
 }
 
 /* The card's corner actions: resize, edit, roll back, delete. Small circles
-   that only surface on hover on a pointer — always there on touch. */
+   that only surface on hover on a pointer — always there on touch. They sit
+   in the chalk block's inner top-right corner (14px, matching its padding)
+   and the title/body reserve 132px on the right so the cluster never
+   overlaps the text it floats above. */
 .card-buttons-top-right {
   position: absolute;
-  top: 10px;
+  top: 14px;
   right: 10px;
   display: flex;
   gap: 2px;
@@ -2159,7 +2164,9 @@ button.ghost.danger:hover:not(:disabled) {
 
   .note-chalk h2,
   .body-colored {
-    padding-right: 58px;
+    /* 158px clears the always-visible corner cluster on touch (4 x 34px +
+       gaps + right inset), which is wider than the desktop one. */
+    padding-right: 158px;
   }
 
   /* Card actions stay permanently visible — there is no hover on touch — but
