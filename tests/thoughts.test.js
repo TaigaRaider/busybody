@@ -31,6 +31,19 @@ describe("attributed thoughts", () => {
   const post = (api, body, title = "topic") =>
     api.post("/notes", { title, body });
 
+  /** Reads the stored edit trail straight from the database. */
+  const historyLen = async (noteId) => {
+    const { db } = await import("../lib/db.js");
+    const { notes } = await import("../lib/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db
+      .select({ history: notes.history })
+      .from(notes)
+      .where(eq(notes.id, noteId))
+      .limit(1);
+    return JSON.parse(rows[0].history || "[]").length;
+  };
+
   // Named throwaway accounts for the permission and deletion tests. Chalk is
   // unique per user, so registration walks the palette until a free colour is
   // found; every colour freed by a deleted account is retried from the start.
@@ -238,7 +251,10 @@ describe("attributed thoughts", () => {
     assert.equal(res.body.thoughts[0].text, "the opening v2");
     assert.equal(res.body.thoughts[1].text, "bob's take");
     assert.ok(res.body.body.includes("bob's take"));
-    assert.equal(JSON.parse(res.body.history).length, 1);
+    // The edit trail is recorded in the store (rollback reads it from there),
+    // and it is never shipped back to the client with the card.
+    assert.equal(await historyLen(created.body.id), 1);
+    assert.equal(res.body.history, undefined);
   });
 
   it("refuses to roll a card back once others have appended", async () => {
@@ -322,11 +338,12 @@ describe("attributed thoughts", () => {
     assert.equal(refused.status, 403);
     assert.equal(refused.body.code, "NEEDS_REQUEST");
 
-    // …and an outsider to the private room cannot even resolve the card.
+    // …and an outsider to the private room cannot even resolve the card: the
+    // id answers exactly like one that does not exist.
     const outsider = await make("outsider");
     const blind = await outsider.api.post(`/notes/${note.id}/thoughts`, { text: "?" });
-    assert.equal(blind.status, 403);
-    assert.equal(blind.body.code, "NEEDS_REQUEST");
+    assert.equal(blind.status, 404);
+    assert.equal(blind.body.code, "NOT_FOUND");
   });
 
   it("keeps public-space non-members read-only", async () => {

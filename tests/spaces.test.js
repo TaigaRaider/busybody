@@ -204,6 +204,31 @@ describe("spaces and access requests", () => {
     assert.equal((await spaceNotes(guest.api)).status, 403);
   });
 
+  it("keeps the author's rights to their own card after losing membership", async () => {
+    // Re-admit guest (who left in the previous test) so they can write a card.
+    const readded = await owner.api.post(`/spaces/${spaceId}/members`, {
+      handle: guest.handle,
+      role: "participant",
+    });
+    assert.equal(readded.status, 201, JSON.stringify(readded.body));
+
+    const mine = (await postNote(guest.api, "written while a member")).body;
+
+    // A stranger to the room gets a phantom for the same id.
+    const blind = await outsider.api.del(`/notes/${mine.id}`);
+    assert.equal(blind.status, 404, "a stranger cannot confirm the card exists");
+    assert.equal(blind.body.code, "NOT_FOUND");
+
+    // Leave, then confirm the card stays theirs: edit and delete still work.
+    assert.equal((await guest.api.post(`/spaces/${spaceId}/leave`)).status, 204);
+    const edited = await guest.api.put(`/notes/${mine.id}`, {
+      title: "still mine",
+      body: "v2",
+    });
+    assert.equal(edited.status, 200, JSON.stringify(edited.body));
+    assert.equal((await guest.api.del(`/notes/${mine.id}`)).status, 204);
+  });
+
   /* -------------------------- deny + escalate --------------------------- */
 
   it("denies a request", async () => {

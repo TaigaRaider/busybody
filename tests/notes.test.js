@@ -22,6 +22,19 @@ describe("notes", () => {
   const post = (api, body, title = "topic") =>
     api.post("/notes", { title, body });
 
+  /** Reads the stored edit trail straight from the database. */
+  const historyLen = async (noteId) => {
+    const { db } = await import("../lib/db.js");
+    const { notes } = await import("../lib/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db
+      .select({ history: notes.history })
+      .from(notes)
+      .where(eq(notes.id, noteId))
+      .limit(1);
+    return JSON.parse(rows[0].history || "[]").length;
+  };
+
   it("creates a note wrapped in the author's chalk", async () => {
     const res = await post(ada.api, "hello world");
     assert.equal(res.status, 201);
@@ -126,7 +139,10 @@ describe("notes", () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.title, "second");
     assert.notEqual(res.body.updatedAt, res.body.createdAt);
-    assert.equal(JSON.parse(res.body.history).length, 1);
+    // The edit trail is recorded, and it stays off the wire: `history` is the
+    // private store that rollback reads from, not part of the published card.
+    assert.equal(await historyLen(created.body.id), 1);
+    assert.equal(res.body.history, undefined);
   });
 
   it("rolls back to the previous revision", async () => {
@@ -139,7 +155,7 @@ describe("notes", () => {
     assert.equal(rolled.status, 200);
     assert.equal(rolled.body.title, "v1");
     assert.ok(rolled.body.body.includes("v1"));
-    assert.equal(JSON.parse(rolled.body.history).length, 0);
+    assert.equal(await historyLen(created.body.id), 0);
   });
 
   it("refuses a rollback with no history", async () => {
@@ -159,7 +175,10 @@ describe("notes", () => {
     }
     const list = await ada.api.get("/notes");
     const found = list.body.items.find((n) => n.id === created.body.id);
-    assert.equal(JSON.parse(found.history).length, 20);
+    // Still stored (the 20-revision ceiling lives in the store), still not
+    // shipped to readers.
+    assert.equal(await historyLen(created.body.id), 20);
+    assert.equal(found.history, undefined);
   });
 
   it("stops a stranger rolling back", async () => {
