@@ -154,6 +154,15 @@ const BOOTSTRAP = [
      window_start INTEGER NOT NULL,
      count INTEGER NOT NULL
    )`,
+  // Lightweight audit trail for privileged mutations; see lib/schema.js.
+  `CREATE TABLE IF NOT EXISTS admin_actions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     actor_id INTEGER,
+     actor_role TEXT NOT NULL,
+     action TEXT NOT NULL,
+     details TEXT NOT NULL,
+     created_at TEXT NOT NULL
+   )`,
 ];
 
 async function tableExists(client, name) {
