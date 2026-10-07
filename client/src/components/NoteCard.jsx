@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { renderRuns } from "../../../lib/richtext";
 import { IconClose, IconFit, IconPencil, IconUndo } from "./Icons";
 
@@ -57,6 +57,7 @@ export default function NoteCard({
   onEditThought,
   onDeleteVote,
   onTag,
+  onFocus,
   canResize = true,
 }) {
   const perm = note.perm || {};
@@ -79,6 +80,31 @@ export default function NoteCard({
   const [appendText, setAppendText] = useState("");
   const [editingThought, setEditingThought] = useState(null); // thought id + draft
   const [thoughtBusy, setThoughtBusy] = useState(false);
+
+  // A card is "clipped" when its content outgrows the height cap. The cap stops
+  // boxes from stretching into tall columns as the grid narrows — which is what
+  // made text re-wrap awkwardly. Clipped cards fade out at the bottom and offer
+  // a focus trigger instead of a scrollbar inside a fixed-height box. The two
+  // observers keep the measure honest: ResizeObserver catches the box shrinking
+  // (size cycle, narrower viewport), MutationObserver catches content changing
+  // (a thought appended, an edit saved, the consent poll appearing).
+  const chalkRef = useRef(null);
+  const [clipped, setClipped] = useState(false);
+
+  useEffect(() => {
+    const el = chalkRef.current;
+    if (!el || !onFocus) return undefined;
+    const measure = () => setClipped(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const mo = new MutationObserver(measure);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [onFocus]);
 
   const submitAppend = async () => {
     const text = appendText.trim();
@@ -186,7 +212,11 @@ export default function NoteCard({
         )}
       </div>
 
-      <div className="note-chalk" style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}>
+      <div
+        ref={chalkRef}
+        className={`note-chalk${clipped ? " clipped" : ""}`}
+        style={{ borderLeftColor: note.authorColor || "var(--gray-600)" }}
+      >
         {note.title && <h2>{note.title}</h2>}
 
         {multiThought ? (
@@ -334,6 +364,17 @@ export default function NoteCard({
               </button>
             )}
           </div>
+        )}
+
+        {clipped && onFocus && (
+          <button
+            type="button"
+            className="focus-trigger"
+            aria-label="Read the full note"
+            onClick={() => onFocus(note)}
+          >
+            Read the rest
+          </button>
         )}
       </div>
     </article>

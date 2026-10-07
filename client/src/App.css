@@ -1191,6 +1191,10 @@ button.ghost.danger:hover:not(:disabled) {
   background: var(--surface);
   text-align: left;
   transition: border-color 0.15s ease;
+  /* The height cap: a box never stretches into a tall column as the grid
+     narrows. Content that reaches the cap is clipped (see .note-chalk) and
+     read via the "Read the rest" trigger, which opens the full-note reader. */
+  max-height: 360px;
 }
 
 .note-card:hover {
@@ -1217,13 +1221,16 @@ button.ghost.danger:hover:not(:disabled) {
   grid-row: span 2;
 }
 
-/* The card's chalk stripe. Border-left plus a matching radius means the
-   stripe follows the card's rounded corner instead of poking into it. */
+/* The card's chalk stripe. Overflow is hidden so a card taller than the cap
+   clips instead of growing the box; a clipped card gets a bottom fade and the
+   "Read the rest" trigger (both keyed off the JS-measured .clipped class). */
 .note-chalk {
   padding: 14px 16px;
   border-left: 3px solid var(--gray-600);
   border-radius: 0;
   height: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .note-chalk h2 {
@@ -1295,6 +1302,102 @@ button.ghost.danger:hover:not(:disabled) {
   color: var(--text-3);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
+}
+
+/* A clipped card fades into the surface at the bottom so the cut reads as
+   "there is more below", and the trigger sits inside that fade. The fade is
+   paint-only (pointer-events: none) so it never swallows a click. */
+.note-chalk.clipped::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56px;
+  background: linear-gradient(180deg, rgba(22, 24, 28, 0), var(--surface));
+  pointer-events: none;
+}
+
+.focus-trigger {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--elevated);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.focus-trigger:hover {
+  border-color: var(--text-1);
+  background: rgba(231, 233, 234, 0.1);
+}
+
+/* ------------------------------------------------------------------ *
+ * full-note reader (focus modal)
+ * ------------------------------------------------------------------ */
+
+.focus-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px 48px;
+  overflow-y: auto;
+}
+
+/* The reader is a fixed-width column: the note keeps its line breaks instead of
+   re-wrapping to whatever the shrunken grid box allowed. */
+.focus-modal {
+  width: min(680px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.focus-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.focus-close {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--elevated);
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.focus-close:hover {
+  background: rgba(231, 233, 234, 0.1);
+}
+
+/* In the reader the card drops the cap, so all of it is visible; resize is a
+   grid-layout preference that means nothing here, so it is not rendered. */
+.focus-modal .note-card {
+  max-height: none;
+}
+
+.focus-modal .focus-trigger {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1640,6 +1743,9 @@ button.ghost.danger:hover:not(:disabled) {
 
 .mention-feed-item .note-card {
   display: block;
+  /* The mention feed is a linear, full-width reader of its own; a long note
+     there reads fine inline, so it does not take the board's height cap. */
+  max-height: none;
 }
 
 .mention-where {
@@ -2187,6 +2293,22 @@ button.ghost.danger:hover:not(:disabled) {
   .append-actions button {
     min-height: 34px;
     padding: 5px 12px;
+  }
+
+  /* "Read the rest" gets a thumb target too; the reader takes the full width
+     on a phone and the scrim pads for the safe areas. */
+  .focus-trigger {
+    right: 12px;
+    bottom: 12px;
+    min-height: 34px;
+  }
+
+  .focus-scrim {
+    padding: 20px 12px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .focus-modal {
+    width: 100%;
   }
 
   /* The bottom bar is the mentions affordance now; two would be noise. */

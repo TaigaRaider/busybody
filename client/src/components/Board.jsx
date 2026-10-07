@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { stripMarkup } from "../../../lib/richtext";
 import Composer from "./Composer";
 import NoteCard from "./NoteCard";
@@ -55,6 +56,30 @@ export default function Board({
    * loaded", which would look like a failed search rather than an answer.
    */
   const askingWhoAmI = query === "whoami" || query === "whoami?";
+
+  // The focused (full-view) note. Kept as an id so the reader always shows the
+  // freshest copy of the note — after an append or an edit it re-resolves from
+  // the loaded pages — and closes on its own if the note disappears (deleted or
+  // dropped off the paged set). While an edit is active it resolves to nothing,
+  // so the reader closes and the composer opens front and centre instead of
+  // hiding behind the overlay.
+  const [focusedId, setFocusedId] = useState(null);
+  const focused =
+    focusedId && !editing ? notes.find((n) => n.id === focusedId) : null;
+
+  useEffect(() => {
+    if (!focusedId) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") setFocusedId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [focusedId]);
 
   const visible = askingWhoAmI
     ? []
@@ -209,10 +234,51 @@ export default function Board({
             onEditThought={onEditThought}
             onDeleteVote={onDeleteVote}
             onTag={onTag}
+            onFocus={(note) => setFocusedId(note.id)}
             canResize={!ghosted}
           />
         ))}
       </div>
+
+      {/* The full-note reader. A clipped card ("Read the rest") opens here at
+          full height with every action the board offers; the width is fixed so
+          the text keeps its line breaks instead of re-wrapping to whatever the
+          grid shrank to. Closes on Close / Escape / tapping the scrim, and by
+          itself when the note it shows is deleted. */}
+      {focused && (
+        <div
+          className="focus-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full note"
+          onClick={() => setFocusedId(null)}
+        >
+          <div className="focus-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="focus-bar">
+              <span>Full view of this note</span>
+              <button
+                type="button"
+                className="focus-close"
+                autoFocus
+                onClick={() => setFocusedId(null)}
+              >
+                Close
+              </button>
+            </div>
+            <NoteCard
+              note={focused}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onRollback={onRollback}
+              onAppend={onAppend}
+              onEditThought={onEditThought}
+              onDeleteVote={onDeleteVote}
+              onTag={onTag}
+              canResize={false}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Suppressed while asking: paging the board you just asked to be told
           where you are would answer a different question. */}
