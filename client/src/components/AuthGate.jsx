@@ -86,7 +86,7 @@ export default function AuthGate({ onAuthenticated, children }) {
   const sharedFields = (
     <>
       <label className="gate-label" htmlFor="handle">
-        your handle
+        Handle
       </label>
       <input
         id="handle"
@@ -101,7 +101,7 @@ export default function AuthGate({ onAuthenticated, children }) {
       {error?.field === "handle" && <p className="gate-error">{error.message}</p>}
 
       <label className="gate-label" htmlFor="password">
-        your password
+        Password
       </label>
       <input
         id="password"
@@ -121,6 +121,11 @@ export default function AuthGate({ onAuthenticated, children }) {
       <div className="gate-card">
         <h1>TABLOID</h1>
         <p className="gate-sub">The anonymous blackboard</p>
+        <p className="gate-intro">
+          A shared board. Post a note, add a thought to anyone's note, and
+          tag people with @handle. No email, no profile — just a handle and
+          a chalk colour.
+        </p>
 
         <div className="gate-tabs">
           <button
@@ -128,14 +133,14 @@ export default function AuthGate({ onAuthenticated, children }) {
             className={mode === "join" ? "active" : ""}
             onClick={() => switchMode("join")}
           >
-            join
+            Join
           </button>
           <button
             type="button"
             className={mode === "signin" ? "active" : ""}
             onClick={() => switchMode("signin")}
           >
-            sign in
+            Sign in
           </button>
         </div>
 
@@ -144,7 +149,7 @@ export default function AuthGate({ onAuthenticated, children }) {
             {sharedFields}
 
             <label className="gate-label" htmlFor="chalk">
-              your chalk
+              Chalk color
             </label>
             <div className="gate-chalk">
               <input
@@ -164,7 +169,7 @@ export default function AuthGate({ onAuthenticated, children }) {
               type="submit"
               disabled={!handleValid || !passwordOk || busy}
             >
-              {busy ? "joining…" : "join the board"}
+              {busy ? "Joining…" : "Join the board"}
             </button>
             <p className="gate-fine">
               Your colour is claimed to your handle, so nobody else can take it.
@@ -182,7 +187,7 @@ export default function AuthGate({ onAuthenticated, children }) {
               type="submit"
               disabled={!handleValid || !password || busy}
             >
-              {busy ? "checking…" : "sign in"}
+              {busy ? "Checking…" : "Sign in"}
             </button>
             <p className="gate-fine">
               Your password is exchanged for a token kept in this browser only.

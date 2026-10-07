@@ -1,3 +1,5 @@
+import { IconAt, IconMenu, IconPlus } from "./Icons";
+
 /**
  * The mobile bottom bar. Rendered only below the `MOBILE_MAX` breakpoint — see
  * `layout.js` for why that value is shared with the CSS.
@@ -7,9 +9,9 @@
  * Moving navigation to a fixed bar means the board is the first thing on screen
  * and the controls are reachable with a thumb.
  *
- * Labels are spelled out rather than left to glyphs alone: the bar is the only
+ * Labels are spelled out rather than left to icons alone: the bar is the only
  * navigation a touch user has, and a row of three ambiguous icons is not
- * self-explanatory. The glyphs are decorative reinforcement.
+ * self-explanatory. The icons are decorative reinforcement.
  */
 export default function TabBar({
   onOpenSpaces,
@@ -22,7 +24,7 @@ export default function TabBar({
     <nav className="tabbar" aria-label="Main">
       <button type="button" className="tab" onClick={onOpenSpaces}>
         <span className="tab-glyph" aria-hidden="true">
-          &#9776;
+          <IconMenu size={22} />
         </span>
         <span className="tab-label">Spaces</span>
       </button>
@@ -30,7 +32,7 @@ export default function TabBar({
       {canPost ? (
         <button type="button" className="tab tab-primary" onClick={onPost}>
           <span className="tab-glyph" aria-hidden="true">
-            +
+            <IconPlus size={22} />
           </span>
           <span className="tab-label">Post</span>
         </button>
@@ -42,7 +44,7 @@ export default function TabBar({
 
       <button type="button" className="tab" onClick={onOpenMentions}>
         <span className="tab-glyph" aria-hidden="true">
-          @
+          <IconAt size={22} />
         </span>
         <span className="tab-label">Mentions</span>
         {mentionCount > 0 && (

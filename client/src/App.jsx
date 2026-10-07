@@ -682,7 +682,7 @@ export default function App() {
               requests are closed.
             </div>
             <button type="button" onClick={handleRevive} disabled={ghosting}>
-              {ghosting ? "waking…" : "revive"}
+              {ghosting ? "Waking…" : "Revive"}
             </button>
           </div>
         )}
@@ -691,7 +691,7 @@ export default function App() {
           <div className="main-title">
             <h1>{view === "mentions" ? "Your mentions" : space ? space.name : "Lobby"}</h1>
             {view === "mentions" ? (
-              <p className="subtitle">notes where somebody tagged you</p>
+              <p className="subtitle">Notes where somebody tagged you</p>
             ) : space ? (
               <>
                 <p className="subtitle">
@@ -712,12 +712,12 @@ export default function App() {
           </div>
           {view === "board" && space && (
             <button type="button" className="ghost" onClick={() => setView("mentions")}>
-              mentions
+              Mentions
             </button>
           )}
           {view === "mentions" && (
             <button type="button" className="ghost" onClick={() => setView("board")}>
-              back to board
+              Back to board
             </button>
           )}
         </header>
@@ -727,7 +727,7 @@ export default function App() {
             <div className="mention-feed">
               {feed.items.length === 0 && (
                 <p className="empty">
-                  nothing yet — tag someone with @handle and it shows up here
+                  Nothing yet — tag someone with @handle and it shows up here
                 </p>
               )}
               {feed.items.map(({ note }) => (

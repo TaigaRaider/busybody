@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { searchUsers } from "../api";
+import { IconPlus } from "./Icons";
 
 /** Matches a partially typed tag immediately before the caret. */
 const PARTIAL_TAG = /@([a-z0-9._-]*)$/i;
@@ -126,7 +127,7 @@ export default function Composer({
     return (
       <button type="button" className="composer-collapsed" onClick={onExpand}>
         <span className="composer-collapsed-mark" aria-hidden="true">
-          +
+          <IconPlus size={18} />
         </span>
         Post something
       </button>

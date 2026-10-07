@@ -16,8 +16,8 @@ export default defineConfig({
         short_name: "Tabloid",
         description:
           "The anonymous blackboard — a shared, chalk-coloured bulletin board.",
-        theme_color: "#111111",
-        background_color: "#111111",
+        theme_color: "#000000",
+        background_color: "#000000",
         display: "standalone",
         start_url: "/",
         scope: "/",

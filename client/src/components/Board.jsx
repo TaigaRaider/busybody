@@ -1,6 +1,7 @@
 import { stripMarkup } from "../../../lib/richtext";
 import Composer from "./Composer";
 import NoteCard from "./NoteCard";
+import { IconSearch } from "./Icons";
 
 /**
  * The bento board. Notes arrive a page at a time; "load more" walks the
@@ -110,14 +111,14 @@ export default function Board({
                   disabled={requestingJoin}
                   onClick={onRequestJoin}
                 >
-                  {requestingJoin ? "requesting…" : "request to participate"}
+                  {requestingJoin ? "Requesting…" : "Request to participate"}
                 </button>
               )}
               {/* Withdrawing from here for the same reason: the request was made from
                   here, and AccessPanel is not on screen to undo it. */}
               {onWithdrawJoin && (
                 <button type="button" className="ghost" onClick={onWithdrawJoin}>
-                  withdraw request
+                  Withdraw request
                 </button>
               )}
             </>
@@ -126,10 +127,13 @@ export default function Board({
       )}
 
       <div className="search-bar">
+        <span className="search-icon" aria-hidden="true">
+          <IconSearch size={17} />
+        </span>
         <input
           className="search-input"
           type="search"
-          placeholder="search loaded notes, or @handle…"
+          placeholder="Search these notes…"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
         />
@@ -165,7 +169,30 @@ export default function Board({
       )}
 
       <div className="notes-grid">
-        {notes.length === 0 && <p className="empty">{emptyMessage}</p>}
+        {/* First run: the board is blank, so instead of a bare "no notes yet"
+            this teaches the one thing the board does. It only appears now — once
+            there is a single note, the board speaks for itself. */}
+        {notes.length === 0 && !query && !askingWhoAmI && (
+          <div className="board-empty">
+            <h2 className="board-empty-title">No notes yet</h2>
+            <p className="board-empty-message">{emptyMessage}</p>
+            <ol>
+              <li data-step="1">
+                Post a note with the composer above — a title, a thought, or both.
+              </li>
+              <li data-step="2">
+                Anyone can add their own thought to any note; it is credited to them.
+              </li>
+              <li data-step="3">
+                Type @handle anywhere to tag someone — they will find it under
+                Mentions.
+              </li>
+            </ol>
+          </div>
+        )}
+        {notes.length === 0 && query && !askingWhoAmI && (
+          <p className="empty">nothing matches “{search}” in the notes you have loaded</p>
+        )}
         {notes.length > 0 && visible.length === 0 && !askingWhoAmI && (
           <p className="empty">no matches for “{search}” in the notes you have loaded</p>
         )}
@@ -197,7 +224,7 @@ export default function Board({
             onClick={onLoadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? "loading…" : `load more (${notes.length} shown)`}
+            {loadingMore ? "Loading…" : `Load more (${notes.length} shown)`}
           </button>
         </div>
       )}

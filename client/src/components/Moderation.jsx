@@ -204,7 +204,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
             className={tab === "requests" ? "active" : ""}
             onClick={() => setTab("requests")}
           >
-            requests{pending.length ? ` (${pending.length})` : ""}
+            Requests{pending.length ? ` (${pending.length})` : ""}
           </button>
         )}
         {canRead && (
@@ -213,7 +213,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
             className={tab === "roster" ? "active" : ""}
             onClick={() => setTab("roster")}
           >
-            members ({members.length})
+            Members ({members.length})
           </button>
         )}
       </div>
@@ -240,7 +240,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
                   disabled={busyId === r.id}
                   onClick={() => act(r.id, () => approveRequest(r.id))}
                 >
-                  approve
+                  Approve
                 </button>
                 <button
                   type="button"
@@ -248,7 +248,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
                   disabled={busyId === r.id}
                   onClick={() => act(r.id, () => denyRequest(r.id))}
                 >
-                  deny
+                  Deny
                 </button>
               </div>
             </div>
@@ -272,7 +272,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
         <div className="mod-body">
           {canManageMembers && (
             <form className="member-add" onSubmit={submitAdd}>
-              <p className="member-add-title">add somebody directly</p>
+              <p className="member-add-title">Add somebody directly</p>
               <div className="member-add-row">
                 <div className="member-add-handle">
                   <input
@@ -340,7 +340,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
                   ))}
                 </select>
                 <button type="submit" disabled={adding || !draftHandle.trim()}>
-                  {adding ? "adding…" : "add"}
+                  {adding ? "Adding…" : "Add"}
                 </button>
               </div>
               {addError && <p className="gate-error">{addError}</p>}
@@ -378,7 +378,7 @@ export default function Moderation({ space, caps, onChanged, notify }) {
                   disabled={busyId === m.userId}
                   onClick={() => act(m.userId, () => removeMember(space.id, m.userId))}
                 >
-                  remove
+                  Remove
                 </button>
               )}
             </div>

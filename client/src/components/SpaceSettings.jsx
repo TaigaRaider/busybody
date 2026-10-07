@@ -104,41 +104,41 @@ export default function SpaceSettings({ space, caps, onChanged, onLeft, notify }
       {/* Not a tab, so not a button: this block has no siblings to switch
           between, and a focusable label is a lie to a screen reader. */}
       <div className="mod-tabs">
-        <span className="settings-tab">settings</span>
+        <span className="settings-tab">Settings</span>
       </div>
 
       {canEdit && !editing && (
         <div className="mod-body">
           <dl className="settings-facts">
             <div>
-              <dt>name</dt>
+              <dt>Name</dt>
               <dd>{space.name}</dd>
             </div>
             <div>
-              <dt>visibility</dt>
+              <dt>Visibility</dt>
               <dd>{space.visibility}</dd>
             </div>
             <div>
-              <dt>your role</dt>
+              <dt>Your role</dt>
               <dd>{space.role}</dd>
             </div>
           </dl>
           <div className="row">
             <button type="button" onClick={() => setEditing(true)}>
-              edit
+              Edit
             </button>
             {canDelete &&
               (confirmDelete ? (
                 <>
                   <button type="button" className="danger" disabled={saving} onClick={destroy}>
-                    {saving ? "deleting…" : "yes, delete it"}
+                    {saving ? "Deleting…" : "Yes, delete it"}
                   </button>
                   <button
                     type="button"
                     className="ghost"
                     onClick={() => setConfirmDelete(false)}
                   >
-                    keep it
+                    Keep it
                   </button>
                 </>
               ) : (
@@ -147,12 +147,12 @@ export default function SpaceSettings({ space, caps, onChanged, onLeft, notify }
                   className="ghost danger"
                   onClick={() => setConfirmDelete(true)}
                 >
-                  delete space
+                  Delete space
                 </button>
               ))}
             {canLeave && (
               <button type="button" className="ghost" disabled={saving} onClick={leave}>
-                {saving ? "leaving…" : "leave space"}
+                {saving ? "Leaving…" : "Leave space"}
               </button>
             )}
           </div>
@@ -161,18 +161,18 @@ export default function SpaceSettings({ space, caps, onChanged, onLeft, notify }
 
       {canEdit && editing && (
         <form className="mod-body space-create" onSubmit={save}>
-          <p className="rekey-title">edit space</p>
+          <p className="rekey-title">Edit space</p>
           <input
             value={name}
             maxLength={80}
-            placeholder="space name"
+            placeholder="Space name"
             aria-label="Space name"
             onChange={(e) => setName(e.target.value)}
           />
           <input
             value={description}
             maxLength={300}
-            placeholder="what is it for? (optional)"
+            placeholder="What is it for? (optional)"
             aria-label="Space description"
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -187,7 +187,7 @@ export default function SpaceSettings({ space, caps, onChanged, onLeft, notify }
           {error && <p className="gate-error">{error}</p>}
           <div className="row">
             <button type="submit" disabled={saving || !name.trim()}>
-              {saving ? "saving…" : "save"}
+              {saving ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
@@ -200,7 +200,7 @@ export default function SpaceSettings({ space, caps, onChanged, onLeft, notify }
                 setVisibility(space.visibility);
               }}
             >
-              cancel
+              Cancel
             </button>
           </div>
         </form>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { renderRuns } from "../../../lib/richtext";
+import { IconClose, IconFit, IconPencil, IconUndo } from "./Icons";
 
 const SIZES = ["small", "wide", "tall", "big"];
 
@@ -138,20 +139,33 @@ export default function NoteCard({
           <button
             type="button"
             className="resize"
-            title={`Resize (${SIZES[(SIZES.indexOf(note.size) + 1) % SIZES.length]})`}
+            title={`Change card size (${SIZES[(SIZES.indexOf(note.size) + 1) % SIZES.length]})`}
+            aria-label="Change card size"
             onClick={() => onResize(note)}
           >
-            ◇
+            <IconFit size={16} />
           </button>
         )}
         {perm.canEdit && (
-          <button type="button" className="edit-button" title="Edit" onClick={() => onEdit(note)}>
-            ∆
+          <button
+            type="button"
+            className="edit-button"
+            title="Edit this note"
+            aria-label="Edit this note"
+            onClick={() => onEdit(note)}
+          >
+            <IconPencil size={16} />
           </button>
         )}
         {perm.canRollback && (
-          <button type="button" className="rollback" title="Roll back one edit" onClick={() => onRollback(note)}>
-            ↩
+          <button
+            type="button"
+            className="rollback"
+            title="Undo the last edit"
+            aria-label="Undo the last edit"
+            onClick={() => onRollback(note)}
+          >
+            <IconUndo size={16} />
           </button>
         )}
         {perm.canDelete && (
@@ -163,10 +177,11 @@ export default function NoteCard({
                 ? `Waiting for consent — ${vote.consents} of ${vote.contributors} contributors agree`
                 : "Delete"
             }
+            aria-label="Delete this note"
             disabled={deletePending}
             onClick={() => onDelete(note)}
           >
-            ×
+            <IconClose size={16} />
           </button>
         )}
       </div>
@@ -208,14 +223,14 @@ export default function NoteCard({
                         disabled={thoughtBusy || !editingThought.draft.trim()}
                         onClick={saveThought}
                       >
-                        {thoughtBusy ? "saving…" : "save"}
+                        {thoughtBusy ? "Saving…" : "Save"}
                       </button>
                       <button
                         type="button"
                         className="ghost"
                         onClick={() => setEditingThought(null)}
                       >
-                        cancel
+                        Cancel
                       </button>
                     </div>
                   </div>
@@ -227,11 +242,12 @@ export default function NoteCard({
                         type="button"
                         className="thought-edit-button"
                         title="Edit your thought"
+                        aria-label="Edit your thought"
                         onClick={() =>
                           setEditingThought({ id: thought.id, draft: thought.text })
                         }
                       >
-                        ✎
+                        <IconPencil size={15} />
                       </button>
                     )}
                   </div>
@@ -286,7 +302,7 @@ export default function NoteCard({
           <div className="append-box">
             <textarea
               rows={2}
-              placeholder="add your own thought…"
+              placeholder="Add a thought of your own…"
               value={appendText}
               onChange={(e) => setAppendText(e.target.value)}
             />
@@ -296,7 +312,7 @@ export default function NoteCard({
                 disabled={appending || !appendText.trim()}
                 onClick={submitAppend}
               >
-                {appending ? "adding…" : "append thought"}
+                {appending ? "Adding…" : "Add"}
               </button>
             </div>
           </div>
@@ -305,7 +321,7 @@ export default function NoteCard({
         {deletePending && (
           <div className="delete-consent">
             <p className="delete-consent-note">
-              ⚖ Removing this card needs the other writers to agree —{" "}
+              Removing this card needs the other writers to agree —{" "}
               {vote.consents} of {vote.contributors} have.
             </p>
             {vote.canVote && !perm.isMine && (
@@ -314,7 +330,7 @@ export default function NoteCard({
                 className="ghost delete-consent-vote"
                 onClick={() => onDeleteVote?.(note)}
               >
-                vote to delete
+                Vote to delete
               </button>
             )}
           </div>

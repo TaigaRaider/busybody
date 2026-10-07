@@ -1,22 +1,52 @@
 :root {
-  --black: #111;
-  --gray-900: #1a1a1a;
-  --gray-800: #222;
-  --gray-700: #333;
-  --gray-600: #555;
-  --gray-500: #777;
-  --gray-400: #999;
-  --gray-300: #ccc;
-  --gray-200: #e5e5e5;
-  --white: #f5f5f5;
+  /* ------------------------------------------------------------------ *
+   * X-style dark palette, tempered to the chalkboard identity of the app.
+   *
+   * Hierarchy the way x.com does it: one bright primary text, one muted
+   * secondary for metadata and hints, faint borders instead of hard boxes.
+   * The only saturated colour used for chrome is the interaction accent
+   * (focus rings, links, tab underlines); chalk colours stay reserved for
+   * people's writing, where they have always belonged.
+   * ------------------------------------------------------------------ */
 
-  --sans: 'Segoe UI', system-ui, Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --bg: #000000;
+  --surface: #16181c; /* cards, panels */
+  --elevated: #1d1f23; /* menus, popovers, hover rows */
+  --border: #2f3336; /* hairlines, card borders */
+  --border-strong: #536471; /* emphasiseable borders */
+  --text-1: #e7e9ea; /* primary text */
+  --text-2: #71767b; /* secondary: timestamps, bylines, hints */
+  --text-3: #536471; /* faint: background copy, placeholders */
+  --accent: #1d9bf0; /* interaction: focus, links, tabs */
+  --danger: #f4212e; /* destructive actions */
+
+  /* Legacy aliases. Some JSX still spells out `var(--gray-600)` for fallback
+     chalk colours, and the manifests/icons are keyed off the #000 background,
+     so the old names keep resolving to the palette above. */
+  --black: #000;
+  --gray-925: #1a1c1f;
+  --gray-900: #16181c;
+  --gray-800: #1d1f23;
+  --gray-700: #2f3336;
+  --gray-600: #536471;
+  --gray-500: #71767b;
+  --gray-400: #8b98a5;
+  --gray-300: #b7c0c7;
+  --gray-200: #e7e9ea;
+  --white: #e7e9ea;
+
+  --red-400: #f4212e;
+  --red-600: #7d1017;
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
 
   font: 15px/1.5 var(--sans);
-  color: var(--gray-400);
-  background: var(--black);
+  color: var(--text-2);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -33,11 +63,37 @@ body {
   width: 100%;
 }
 
-h1, h2 {
-  color: var(--white);
-  font-weight: 600;
+/* A quiet default for the whole chrome: components restyle what they need. */
+button {
+  font-family: var(--sans);
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--text-1);
 }
 
 p {
   margin: 0;
+}
+
+/* One focus ring for the whole app, in the interaction accent. Fields that
+   need a ring that hugs their border override this with a box-shadow. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(29, 155, 240, 0.4);
 }

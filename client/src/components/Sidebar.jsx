@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  IconAt,
+  IconClose,
+  IconKey,
+  IconPause,
+  IconPlus,
+  IconPower,
+  IconRefresh,
+  IconTrash,
+} from "./Icons";
 
 const ROLE_HINT = {
   owner: "owner",
@@ -170,7 +180,7 @@ export default function Sidebar({
           onClick={onCloseDrawer}
           aria-label="Close spaces"
         >
-          &#10005;
+          <IconClose size={18} />
         </button>
       </div>
 
@@ -192,7 +202,7 @@ export default function Sidebar({
             className="discover-search"
             type="search"
             value={discoverQuery}
-            placeholder="find a space"
+            placeholder="Find a space"
             aria-label="Find a space"
             onChange={(e) => setDiscoverQuery(e.target.value)}
           />
@@ -204,7 +214,7 @@ export default function Sidebar({
               "nothing to discover" for somebody with no spaces. */}
           {mine.length > 0 && (
             <div className="group">
-              <h3>your spaces</h3>
+              <h3>Your spaces</h3>
               <ul>
                 {mine.map((s) => (
                   <SpaceRow
@@ -220,7 +230,7 @@ export default function Sidebar({
 
           {lockedVisible.length > 0 && (
             <div className="group">
-              <h3>locked</h3>
+              <h3>Locked</h3>
               <p className="group-hint">private — ask to get in</p>
               <ul>
                 {lockedVisible.map((s) => (
@@ -237,7 +247,7 @@ export default function Sidebar({
 
           {discoverVisible.length > 0 && (
             <div className="group">
-              <h3>discover</h3>
+              <h3>Discover</h3>
               <p className="group-hint">public — read without joining</p>
               <ul>
                 {discoverVisible.map((s) => (
@@ -264,13 +274,13 @@ export default function Sidebar({
             <form className="space-create" onSubmit={submit}>
               <input
                 autoFocus
-                placeholder="space name"
+                placeholder="Space name"
                 value={name}
                 maxLength={80}
                 onChange={(e) => setName(e.target.value)}
               />
               <input
-                placeholder="what is it for? (optional)"
+                placeholder="What is it for? (optional)"
                 value={description}
                 maxLength={300}
                 onChange={(e) => setDescription(e.target.value)}
@@ -280,15 +290,16 @@ export default function Sidebar({
                 <option value="public">public — anyone can read</option>
               </select>
               <div className="row">
-                <button type="submit">create</button>
+                <button type="submit">Create</button>
                 <button type="button" className="ghost" onClick={() => setCreating(false)}>
-                  cancel
+                  Cancel
                 </button>
               </div>
             </form>
           ) : (
             <button type="button" className="space-new" onClick={() => setCreating(true)}>
-              + new space
+              <IconPlus size={16} />
+              New space
             </button>
           ))}
 
@@ -298,28 +309,31 @@ export default function Sidebar({
           {ghosted && (
             <div className="ghost-state">
               <p>
-                you are a ghost
+                You are a ghost
                 <span className="ghost-since">
                   {" "}
                   since {new Date(user.ghostedAt).toLocaleString()}
                 </span>
               </p>
               <button type="button" onClick={onRevive} disabled={ghosting}>
-                {ghosting ? "waking…" : "revive"}
+                {ghosting ? "Waking…" : "Revive"}
               </button>
             </div>
           )}
           {rotatedToken && (
             <div className="token-reveal">
-              <p>your new token — copy it now, it is shown only once:</p>
+              <p>Your new token — copy it now, it is shown only once:</p>
               <code>{rotatedToken}</code>
               <button type="button" className="ghost" onClick={onDismissToken}>
-                dismiss
+                Dismiss
               </button>
             </div>
           )}
           <button type="button" className="mentions-link" onClick={onOpenMentions}>
-            mentions{mentionCount ? ` (${mentionCount})` : ""}
+            <IconAt size={18} />
+            <span>
+              Mentions{mentionCount ? ` (${mentionCount})` : ""}
+            </span>
           </button>
           <div className="me">
             <span className="chalk-dot" style={{ backgroundColor: user.color }} />
@@ -336,10 +350,10 @@ export default function Sidebar({
                     onRotateToken();
                   }}
                 >
-                  {rotating ? "…" : "rotate"}
+                  {rotating ? "…" : "Rotate"}
                 </button>
                 <button type="button" className="ghost" onClick={() => setConfirmRotate(false)}>
-                  no
+                  No
                 </button>
               </span>
             ) : (
@@ -348,8 +362,9 @@ export default function Sidebar({
                 className="ghost"
                 onClick={() => setConfirmRotate(true)}
                 title="Rotate token — the current one stops working immediately"
+                aria-label="Rotate token"
               >
-                ⟳
+                <IconRefresh size={17} />
               </button>
             )}
             <button
@@ -357,8 +372,9 @@ export default function Sidebar({
               className="ghost"
               onClick={() => setRekeying((open) => !open)}
               title="Change your password"
+              aria-label="Change your password"
             >
-              🔑
+              <IconKey size={17} />
             </button>
             {/* Ghosting looks like signing out, so it takes a deliberate second
                 click rather than being one stray tap away. Reviving, by
@@ -376,10 +392,10 @@ export default function Sidebar({
                       onGhost();
                     }}
                   >
-                    {ghosting ? "…" : "go"}
+                    {ghosting ? "…" : "Pause"}
                   </button>
                   <button type="button" className="ghost" onClick={() => setConfirmGhost(false)}>
-                    no
+                    Keep writing
                   </button>
                 </span>
               ) : (
@@ -388,8 +404,9 @@ export default function Sidebar({
                   className="ghost"
                   onClick={() => setConfirmGhost(true)}
                   title="Pause your account — nothing is deleted, and you can come back"
+                  aria-label="Pause your account"
                 >
-                  👻
+                  <IconPause size={17} />
                 </button>
               ))}
             {/* Offered to ghosts too, and deliberately not behind the two-step
@@ -402,17 +419,24 @@ export default function Sidebar({
               className="ghost"
               onClick={() => setConfirmDelete((open) => !open)}
               title="Delete your account for good"
+              aria-label="Delete your account"
             >
-              🗑
+              <IconTrash size={17} />
             </button>
-            <button type="button" className="ghost" onClick={onSignOut} title="Sign out">
-              ⏻
+            <button
+              type="button"
+              className="ghost"
+              onClick={onSignOut}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <IconPower size={17} />
             </button>
           </div>
 
           {confirmDelete && (
             <form className="rekey depart" onSubmit={submitDelete}>
-              <p className="rekey-title">delete @{user.handle} for good</p>
+              <p className="rekey-title">Delete @{user.handle} for good</p>
               <p className="rekey-note">
                 This cannot be undone and there is no way back: your account, your
                 spaces, your memberships and your mentions go. Every note you wrote
@@ -426,7 +450,7 @@ export default function Sidebar({
                 type="password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="your password, to confirm"
+                placeholder="Your password, to confirm"
                 autoComplete="current-password"
                 autoFocus
                 spellCheck={false}
@@ -438,10 +462,10 @@ export default function Sidebar({
                   className="danger"
                   disabled={!deletePassword || deleting}
                 >
-                  {deleting ? "deleting…" : "delete my account"}
+                  {deleting ? "Deleting…" : "Delete my account"}
                 </button>
                 <button type="button" className="ghost" onClick={closeDelete}>
-                  cancel
+                  Cancel
                 </button>
               </div>
             </form>
@@ -449,13 +473,13 @@ export default function Sidebar({
 
           {rekeying && (
             <form className="rekey" onSubmit={submitRekey}>
-              <p className="rekey-title">change your password</p>
+              <p className="rekey-title">Change your password</p>
               <input
                 className="gate-input"
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="current password"
+                placeholder="Current password"
                 autoComplete="current-password"
                 autoFocus
                 spellCheck={false}
@@ -465,7 +489,7 @@ export default function Sidebar({
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="new password (8+ characters)"
+                placeholder="New password (8+ characters)"
                 autoComplete="new-password"
                 spellCheck={false}
               />
@@ -479,10 +503,10 @@ export default function Sidebar({
                   type="submit"
                   disabled={!currentPassword || newPassword.length < 8 || changingPassword}
                 >
-                  {changingPassword ? "saving…" : "save"}
+                  {changingPassword ? "Saving…" : "Save"}
                 </button>
                 <button type="button" className="ghost" onClick={closeRekey}>
-                  cancel
+                  Cancel
                 </button>
               </div>
             </form>

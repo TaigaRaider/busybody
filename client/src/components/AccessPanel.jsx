@@ -37,7 +37,7 @@ export default function AccessPanel({
           </p>
           {pendingRequest && (
             <button type="button" className="ghost" onClick={onWithdraw} disabled={busy}>
-              withdraw request
+              Withdraw request
             </button>
           )}
         </div>
@@ -48,7 +48,7 @@ export default function AccessPanel({
             for a moderator.
           </p>
           <button type="button" className="ghost" onClick={onWithdraw} disabled={busy}>
-            withdraw request
+            Withdraw request
           </button>
         </div>
       ) : (
@@ -86,7 +86,7 @@ export default function AccessPanel({
             rows={2}
           />
           <button type="submit" disabled={busy}>
-            {busy ? "requesting…" : "request access"}
+            {busy ? "Requesting…" : "Request access"}
           </button>
           <p className="access-fine">
             A moderator or the owner approves requests. Tagging someone in a
