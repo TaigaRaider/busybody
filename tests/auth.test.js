@@ -156,6 +156,18 @@ describe("auth", () => {
     assert.ok(res.body.every((u) => !("tokenHash" in u)));
   });
 
+  it("matches underscores literally in handle search", async () => {
+    // Two accounts whose handles differ only by an underscore that a naive
+    // LIKE would treat as a "match any one character" wildcard.
+    await clientFor(server.base).register("u_oo", PALETTE[5]);
+    await clientFor(server.base).register("uxoo", PALETTE[2]);
+
+    const res = await api.get("/users?q=u_oo");
+    assert.equal(res.status, 200);
+    assert.ok(res.body.some((u) => u.handle === "u_oo"));
+    assert.ok(!res.body.some((u) => u.handle === "uxoo"));
+  });
+
   it("lists claimed colours without leaking token hashes", async () => {
     const res = await api.get("/colors");
     assert.equal(res.status, 200);
